@@ -67,9 +67,12 @@ async def serve_sitemap():
     return FileResponse(STATIC_DIR / "sitemap.xml", media_type="application/xml")
 
 
-@app.get("/google{code}.html")
-async def serve_google_verification(code: str):
-    return HTMLResponse(f"google-site-verification: google{code}.html")
+@app.get("/google1ed32eb5fca57737.html")
+async def serve_google_verification():
+    verify_file = STATIC_DIR / "google1ed32eb5fca57737.html"
+    if not verify_file.exists():
+        raise HTTPException(status_code=404, detail="Verification file not found")
+    return FileResponse(verify_file, media_type="text/html")
 
 
 @app.get("/", response_class=HTMLResponse)
