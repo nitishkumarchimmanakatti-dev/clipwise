@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  clipwise:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - clipwise_data:/root/Clipwise
+    environment:
+      - CLIPWISE_WHISPER_MODEL=small
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  clipwise_data:

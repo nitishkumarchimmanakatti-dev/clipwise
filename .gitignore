@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.mp4
+*.wav
+*.srt
+output/
+downloads/
+clipwise_log.csv
+.DS_Store

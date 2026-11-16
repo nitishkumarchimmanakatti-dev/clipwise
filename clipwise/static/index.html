@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Primary Meta Tags -->
+  <title>Clipwise - AI YouTube Shorts Generator | Long Video to Viral Clips</title>
+  <meta name="title" content="Clipwise - AI YouTube Shorts Generator | Long Video to Viral Clips">
+  <meta name="description" content="Clipwise is the official AI agent that turns long YouTube videos into viral 9:16 Shorts. Transcribe speech, isolate high-retention hooks, and burn captions automatically.">
+  <meta name="keywords" content="Clipwise, YouTube Shorts generator, AI video clips, Opus Clip alternative, viral shorts, video repurposing, automatic video editor">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="Clipwise Official">
+  <link rel="canonical" href="https://clipwise.app/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://clipwise.app/">
+  <meta property="og:title" content="Clipwise - Turn Long YouTube Videos into Viral Shorts">
+  <meta property="og:description" content="Official Clipwise web application: auto-transcribe, find viral hooks, crop to 9:16 vertical video, and burn subtitles.">
+  <meta property="og:site_name" content="Clipwise">
+
+  <!-- Twitter Card -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://clipwise.app/">
+  <meta property="twitter:title" content="Clipwise - Official AI YouTube Shorts Maker">
+  <meta property="twitter:description" content="Transform long YouTube videos into viral vertical clips in minutes.">
+
+  <!-- Schema.org JSON-LD for Google Search Rich Results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Clipwise",
+    "url": "https://clipwise.app",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "All",
+    "description": "Intelligent agent that turns long YouTube videos into viral short vertical clips with captions and hook scoring.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-icon">✂️</div>
+        <div class="brand-text">
+          <h1>Clipwise</h1>
+          <span class="badge">Official AI Shorts App</span>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button id="viewHistoryBtn" class="btn btn-secondary">
+          <span>📁 Library</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      <!-- Hero / Input Section -->
+      <section class="hero-section">
+        <div class="hero-header">
+          <h2>Turn 1 Long Video into <span class="gradient-text">10 Viral Shorts</span></h2>
+          <p>The official Clipwise engine finds high-retention hooks, transcribes with Whisper, formats to 9:16 vertical video, and burns dynamic captions.</p>
+        </div>
+
+        <div class="generator-card">
+          <form id="generateForm" class="generator-form">
+            <div class="input-group">
+              <span class="input-icon">🔗</span>
+              <input 
+                type="url" 
+                id="youtubeUrl" 
+                placeholder="Paste YouTube Video URL (e.g., https://www.youtube.com/watch?v=...)" 
+                required
+              />
+              <button type="submit" id="submitBtn" class="btn btn-primary">
+                <span>Generate Clips</span>
+                <span class="btn-arrow">→</span>
+              </button>
+            </div>
+
+            <div class="options-bar">
+              <div class="option-item">
+                <label for="maxClips">Max Clips:</label>
+                <select id="maxClips">
+                  <option value="3">3 Clips</option>
+                  <option value="5" selected>5 Clips (Recommended)</option>
+                  <option value="10">10 Clips</option>
+                </select>
+              </div>
+
+              <div class="option-item">
+                <label for="renderMode">Aspect Format:</label>
+                <select id="renderMode">
+                  <option value="blur" selected>Blurred Background (9:16)</option>
+                  <option value="crop">Center Crop (9:16)</option>
+                </select>
+              </div>
+
+              <div class="option-item checkbox-item">
+                <input type="checkbox" id="useLlm">
+                <label for="useLlm">AI Hook Enrichment (LLM)</label>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Live Processing Visualizer -->
+      <section id="progressSection" class="progress-section hidden">
+        <div class="progress-card">
+          <div class="progress-header">
+            <div class="spinner"></div>
+            <div class="progress-info">
+              <h3 id="currentStepText">Starting video processing...</h3>
+              <p id="progressPercentage">0%</p>
+            </div>
+          </div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <details class="logs-accordion">
+            <summary>View Pipeline Console Logs</summary>
+            <div id="logsConsole" class="logs-console"></div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Clips Gallery Section -->
+      <section id="resultsSection" class="results-section hidden">
+        <div class="results-header">
+          <div>
+            <h3>Generated Shorts Candidates</h3>
+            <p id="resultsSubtitle">Review, approve, or download your ready-to-publish clips.</p>
+          </div>
+          <div class="filter-pills">
+            <button class="pill active" data-filter="all">All</button>
+            <button class="pill" data-filter="pending">Pending</button>
+            <button class="pill" data-filter="approved">Approved</button>
+            <button class="pill" data-filter="rejected">Rejected</button>
+          </div>
+        </div>
+
+        <div id="clipsGrid" class="clips-grid">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+    </main>
+
+    <!-- History Drawer / Modal -->
+    <div id="historyModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Past Video Projects</h3>
+          <button id="closeModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div id="historyList" class="history-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

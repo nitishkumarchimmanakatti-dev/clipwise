@@ -1,0 +1,250 @@
+/**
+ * Clipwise Frontend Application Logic
+ */
+
+let currentTaskId = null;
+let pollInterval = null;
+let allClips = [];
+let currentFilter = 'all';
+
+// DOM Elements
+const generateForm = document.getElementById('generateForm');
+const youtubeUrlInput = document.getElementById('youtubeUrl');
+const maxClipsSelect = document.getElementById('maxClips');
+const renderModeSelect = document.getElementById('renderMode');
+const useLlmCheckbox = document.getElementById('useLlm');
+const submitBtn = document.getElementById('submitBtn');
+
+const progressSection = document.getElementById('progressSection');
+const progressBar = document.getElementById('progressBar');
+const progressPercentage = document.getElementById('progressPercentage');
+const currentStepText = document.getElementById('currentStepText');
+const logsConsole = document.getElementById('logsConsole');
+
+const resultsSection = document.getElementById('resultsSection');
+const clipsGrid = document.getElementById('clipsGrid');
+const filterPills = document.querySelectorAll('.filter-pills .pill');
+
+const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+const historyModal = document.getElementById('historyModal');
+const closeModalBtn = document.getElementById('closeModalBtn');
+const historyList = document.getElementById('historyList');
+
+// Form Submission
+generateForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = youtubeUrlInput.value.trim();
+  if (!url) return;
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span>Processing...</span>';
+  
+  progressSection.classList.remove('hidden');
+  resultsSection.classList.add('hidden');
+  logsConsole.innerHTML = '';
+  updateProgress(5, 'Submitting job...');
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url,
+        max_clips: parseInt(maxClipsSelect.value),
+        mode: renderModeSelect.value,
+        use_llm: useLlmCheckbox.checked,
+        force: false
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to submit generation task');
+    }
+
+    const data = await res.json();
+    currentTaskId = data.task_id;
+    startPolling(currentTaskId, data.video_id);
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
+    progressSection.classList.add('hidden');
+  }
+});
+
+function updateProgress(percent, text) {
+  progressBar.style.width = `${percent}%`;
+  progressPercentage.textContent = `${percent}%`;
+  if (text) currentStepText.textContent = text;
+}
+
+function startPolling(taskId, videoId) {
+  if (pollInterval) clearInterval(pollInterval);
+
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/task/${taskId}`);
+      if (!res.ok) return;
+
+      const task = await res.json();
+      updateProgress(task.progress, task.current_step);
+
+      // Update logs
+      if (task.logs && task.logs.length > 0) {
+        logsConsole.innerHTML = task.logs.map(line => `<div>${escapeHtml(line)}</div>`).join('');
+        logsConsole.scrollTop = logsConsole.scrollHeight;
+      }
+
+      if (task.status === 'completed') {
+        clearInterval(pollInterval);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
+        progressSection.classList.add('hidden');
+        loadClipsForVideo(videoId);
+      } else if (task.status === 'failed') {
+        clearInterval(pollInterval);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
+        alert(`Pipeline error: ${task.error}`);
+      }
+    } catch (e) {
+      console.error('Polling error', e);
+    }
+  }, 1200);
+}
+
+async function loadClipsForVideo(videoId) {
+  try {
+    const res = await fetch(`/api/clips/${videoId}`);
+    if (!res.ok) throw new Error('Could not fetch clips');
+    const data = await res.json();
+    allClips = data.clips || [];
+    renderClipsGrid();
+    resultsSection.classList.remove('hidden');
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderClipsGrid() {
+  clipsGrid.innerHTML = '';
+  const filtered = allClips.filter(c => {
+    if (currentFilter === 'all') return true;
+    return c.status === currentFilter;
+  });
+
+  if (filtered.length === 0) {
+    clipsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 40px;">No clips found in this filter category.</div>';
+    return;
+  }
+
+  filtered.forEach(clip => {
+    const card = document.createElement('div');
+    card.className = 'clip-card';
+    card.id = `card-${clip.clip_id}`;
+
+    const hookScore = clip.hook_score || 0;
+    const scoreEmoji = hookScore >= 8.5 ? '🔥' : hookScore >= 7.0 ? '⚡' : '✨';
+
+    card.innerHTML = `
+      <div class="video-container">
+        <video src="${clip.video_url}" controls playsinline preload="metadata"></video>
+        <div class="hook-badge">${scoreEmoji} ${hookScore.toFixed(1)}/10 Hook</div>
+        <div class="status-badge status-${clip.status}">${clip.status}</div>
+      </div>
+      <div class="clip-content">
+        <div class="clip-meta-top">
+          <span>⏱ ${clip.duration}s (${clip.start_formatted} - ${clip.end_formatted})</span>
+        </div>
+        <h4 class="clip-title">${escapeHtml(clip.title)}</h4>
+        <div class="hashtags-container">
+          ${(clip.hashtags || []).map(tag => `<span class="hashtag-pill" onclick="copyText('${tag}')">${tag}</span>`).join('')}
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-approve" onclick="updateStatus('${clip.clip_id}', 'approved')">✓ Approve</button>
+          <button class="btn btn-reject" onclick="updateStatus('${clip.clip_id}', 'rejected')">✗ Reject</button>
+          <a href="${clip.download_url}" class="btn-download" download title="Download MP4">💾</a>
+        </div>
+      </div>
+    `;
+    clipsGrid.appendChild(card);
+  });
+}
+
+// Inline Clip Approval & Rejection
+async function updateStatus(clipId, newStatus) {
+  try {
+    const res = await fetch(`/api/clips/${clipId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    if (!res.ok) throw new Error('Status update failed');
+
+    // Update local cache
+    const match = allClips.find(c => c.clip_id === clipId);
+    if (match) match.status = newStatus;
+
+    renderClipsGrid();
+  } catch (err) {
+    alert(`Could not update clip status: ${err.message}`);
+  }
+}
+
+// Filter Tabs
+filterPills.forEach(pill => {
+  pill.addEventListener('click', () => {
+    filterPills.forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    currentFilter = pill.dataset.filter;
+    renderClipsGrid();
+  });
+});
+
+// History Library Modal
+viewHistoryBtn.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/history');
+    if (!res.ok) throw new Error('Could not load history');
+    const history = await res.json();
+
+    if (history.length === 0) {
+      historyList.innerHTML = '<p style="color: #94a3b8;">No past projects found yet.</p>';
+    } else {
+      historyList.innerHTML = history.map(item => `
+        <div class="history-item" style="display:flex; justify-content:space-between; align-items:center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;" onclick="openProject('${item.video_id}')">
+          <div>
+            <strong style="color: #fff; font-size: 14px;">${escapeHtml(item.title)}</strong>
+            <p style="color: #94a3b8; font-size: 12px;">${item.channel} • ${item.clip_count} clips</p>
+          </div>
+          <button class="btn btn-secondary" style="font-size: 11px;">Open</button>
+        </div>
+      `).join('');
+    }
+
+    historyModal.classList.remove('hidden');
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+function openProject(videoId) {
+  historyModal.classList.add('hidden');
+  loadClipsForVideo(videoId);
+}
+
+closeModalBtn.addEventListener('click', () => {
+  historyModal.classList.add('hidden');
+});
+
+function copyText(text) {
+  navigator.clipboard.writeText(text);
+  alert(`Copied ${text} to clipboard!`);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
