@@ -67,6 +67,11 @@ async def serve_sitemap():
     return FileResponse(STATIC_DIR / "sitemap.xml", media_type="application/xml")
 
 
+@app.get("/google{code}.html")
+async def serve_google_verification(code: str):
+    return HTMLResponse(f"google-site-verification: google{code}.html")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_file = STATIC_DIR / "index.html"
