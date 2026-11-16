@@ -21,10 +21,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application source code
 COPY . .
 
-# Expose server port
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Expose default port
 EXPOSE 8000
 
-ENV PYTHONUNBUFFERED=1
-
-# Start FastAPI server
-CMD ["uvicorn", "clipwise.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start FastAPI server using Railway's PORT or fallback to 8000
+CMD ["sh", "-c", "uvicorn clipwise.app:app --host 0.0.0.0 --port ${PORT:-8000}"]

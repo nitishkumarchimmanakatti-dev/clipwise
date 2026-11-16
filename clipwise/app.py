@@ -16,7 +16,16 @@ import uvicorn
 from clipwise.config import OUTPUT_DIR, DOWNLOADS_DIR, ensure_ffmpeg
 from clipwise.download import validate_youtube_url
 from clipwise.review import set_clip_status, load_review_sheet, get_all_pending_clips
-from clipwise.main import run_pipeline
+try:
+    from main import run_pipeline
+except ImportError:
+    try:
+        from clipwise.main import run_pipeline
+    except ImportError:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from main import run_pipeline
 
 app = FastAPI(title="Clipwise Web", description="Turn long YouTube videos into viral shorts")
 
