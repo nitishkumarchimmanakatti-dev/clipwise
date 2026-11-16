@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://clipwise.app/sitemap.xml
+Sitemap: https://clipwise-app.up.railway.app/sitemap.xml
