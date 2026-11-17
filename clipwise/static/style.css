@@ -25,9 +25,44 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* 3D Canvas Background */
+#bg3d-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 20%, #10132b 0%, #06070c 80%);
+}
+
+/* Ambient 3D Depth Glow */
+.ambient-glow {
+  position: fixed;
+  top: 25%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 700px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.18) 40%, transparent 70%);
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 1;
+  animation: pulseGlow 9s ease-in-out infinite alternate;
+}
+
+@keyframes pulseGlow {
+  0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.65; }
+  100% { transform: translate(-50%, -45%) scale(1.15); opacity: 0.95; }
 }
 
 .app-layout {
+  position: relative;
+  z-index: 2;
   max-width: 1300px;
   margin: 0 auto;
   padding: 0 24px 60px;
@@ -38,8 +73,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px 24px;
+  margin-top: 16px;
+  background: rgba(19, 21, 31, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
   margin-bottom: 40px;
 }
 
@@ -101,13 +141,17 @@ body {
 
 /* Generator Card */
 .generator-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+  background: rgba(19, 21, 31, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8), 0 0 50px rgba(99, 102, 241, 0.15);
   max-width: 860px;
   margin: 0 auto;
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out, box-shadow 0.3s ease;
 }
 
 .input-group {
@@ -337,18 +381,21 @@ body {
 }
 
 .clip-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 18px;
+  background: rgba(19, 21, 31, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .clip-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-6px) scale(1.01);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8), 0 0 25px rgba(99, 102, 241, 0.2);
 }
 
 .video-container {

@@ -50,6 +50,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- 3D Motion WebGL Canvas -->
+  <canvas id="bg3d-canvas"></canvas>
+  <div class="ambient-glow"></div>
+
   <div class="app-layout">
     <!-- Header -->
     <header class="navbar">
@@ -174,6 +178,9 @@
     </div>
   </div>
 
+  <!-- Three.js & 3D Interactive Background -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/static/bg3d.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
