@@ -91,10 +91,15 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
         return video_file, audio_file, metadata
 
     ydl_opts = {
-        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
+        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
         "outtmpl": video_target_pattern,
         "noplaylist": True,
         "merge_output_format": "mp4",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "mweb"],
+            }
+        },
         "quiet": False,
         "no_warnings": False,
         "postprocessors": [
@@ -104,6 +109,19 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
             }
         ],
     }
+
+    # Support optional cookies file for datacenter bypassing if present
+    import os
+    cookies_env = os.getenv("YOUTUBE_COOKIES")
+    cookies_file = Path("/app/cookies.txt")
+    if cookies_env and not cookies_file.exists():
+        try:
+            cookies_file.write_text(cookies_env)
+        except Exception:
+            pass
+
+    if cookies_file.exists():
+        ydl_opts["cookiefile"] = str(cookies_file)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
