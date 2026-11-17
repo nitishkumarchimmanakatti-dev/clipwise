@@ -57,17 +57,17 @@ class StatusUpdateRequest(BaseModel):
     status: str  # 'approved', 'rejected', 'pending'
 
 
-@app.get("/robots.txt")
+@app.api_route("/robots.txt", methods=["GET", "HEAD"])
 async def serve_robots():
     return FileResponse(STATIC_DIR / "robots.txt", media_type="text/plain")
 
 
-@app.get("/sitemap.xml")
+@app.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 async def serve_sitemap():
     return FileResponse(STATIC_DIR / "sitemap.xml", media_type="application/xml")
 
 
-@app.get("/google1ed32eb5fca57737.html")
+@app.api_route("/google1ed32eb5fca57737.html", methods=["GET", "HEAD"])
 async def serve_google_verification():
     verify_file = STATIC_DIR / "google1ed32eb5fca57737.html"
     if not verify_file.exists():
@@ -75,7 +75,7 @@ async def serve_google_verification():
     return FileResponse(verify_file, media_type="text/html")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def serve_index():
     index_file = STATIC_DIR / "index.html"
     if not index_file.exists():
