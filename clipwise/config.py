@@ -21,8 +21,8 @@ MAX_CLIP_DURATION = 60.0  # seconds
 TARGET_CLIP_DURATION = 35.0  # optimal target for short-form
 DEFAULT_MAX_CLIPS = 10
 
-# Whisper Configuration (Optimized for Apple Silicon M-series)
-WHISPER_MODEL = os.getenv("CLIPWISE_WHISPER_MODEL", "small")
+# Whisper Configuration (Optimized for cloud memory efficiency)
+WHISPER_MODEL = os.getenv("CLIPWISE_WHISPER_MODEL", "base")
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 

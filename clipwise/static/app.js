@@ -79,13 +79,26 @@ function updateProgress(percent, text) {
   if (text) currentStepText.textContent = text;
 }
 
+let consecutivePollErrors = 0;
+
 function startPolling(taskId, videoId) {
   if (pollInterval) clearInterval(pollInterval);
+  consecutivePollErrors = 0;
 
   pollInterval = setInterval(async () => {
     try {
       const res = await fetch(`/api/task/${taskId}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        consecutivePollErrors++;
+        if (consecutivePollErrors > 6) {
+          clearInterval(pollInterval);
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
+          alert('Pipeline task was interrupted. Please try again.');
+        }
+        return;
+      }
+      consecutivePollErrors = 0;
 
       const task = await res.json();
       updateProgress(task.progress, task.current_step);

@@ -68,6 +68,10 @@ def transcribe_audio(
             "words": words_list,
         })
 
+    del model
+    import gc
+    gc.collect()
+
     transcript_result = {
         "language": info.language,
         "language_probability": round(info.language_probability, 3),
