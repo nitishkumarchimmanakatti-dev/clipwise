@@ -213,9 +213,13 @@ def run_pipeline_for_file(
 
         clips_info.append({
             "clip_id": clip_id,
-            "title": meta["title"],
-            "hook_score": cand["hook_score"],
+            "start": cand["start"],
+            "end": cand["end"],
             "duration": cand["duration"],
+            "hook_score": cand["hook_score"],
+            "title": meta["title"],
+            "mp4": str(clip_mp4),
+            "srt": str(clip_srt),
             "mp4_url": f"/media/{video_id}/{clip_id}.mp4",
             "srt_url": f"/media/{video_id}/{clip_id}.srt",
             "metadata": meta,
