@@ -100,6 +100,41 @@ def generate_candidate_segments(
 
     # Deduplicate overlapping candidates (IoU > 0.70)
     filtered = filter_overlapping_candidates(candidates)
+
+    # Resilient fallback: if no candidate reached min_duration (e.g. short trailer or brief speech)
+    if not filtered:
+        if sentences:
+            first_start = sentences[0]["start"]
+            last_end = sentences[-1]["end"]
+            clip_start = max(0.0, first_start - 1.0)
+            clip_end = max(clip_start + min_duration, last_end + 1.0)
+            if (clip_end - clip_start) > max_duration:
+                clip_end = clip_start + max_duration
+            
+            all_words = []
+            for s in sentences:
+                all_words.extend(s.get("words", []))
+
+            filtered.append({
+                "start": round(clip_start, 2),
+                "end": round(clip_end, 2),
+                "duration": round(clip_end - clip_start, 2),
+                "text": " ".join(s["text"] for s in sentences).strip(),
+                "words": all_words,
+                "sentence_count": len(sentences),
+            })
+        else:
+            # Fallback for purely visual/music content
+            clip_dur = min(30.0, max(min_duration, transcript.get("duration", 30.0)))
+            filtered.append({
+                "start": 0.0,
+                "end": round(clip_dur, 2),
+                "duration": round(clip_dur, 2),
+                "text": transcript.get("title", "High-Retention Visual Highlight"),
+                "words": [],
+                "sentence_count": 0,
+            })
+
     return filtered
 
 
