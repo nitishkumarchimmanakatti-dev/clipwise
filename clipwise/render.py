@@ -82,6 +82,7 @@ def render_clip(
         
         cmd = [
             ffmpeg_bin, "-y",
+            "-threads", "2",
             "-ss", str(start_time),
             "-to", str(end_time),
             "-i", str(source_video),
@@ -89,7 +90,7 @@ def render_clip(
             "-map", "[vout]",
             "-map", "0:a?",
             "-c:v", "libx264",
-            "-preset", "fast",
+            "-preset", "veryfast",
             "-crf", "22",
             "-c:a", "aac",
             "-b:a", "192k",
@@ -101,6 +102,7 @@ def render_clip(
         filter_complex = base_filter.replace("[v0]", "[vout]")
         cmd = [
             ffmpeg_bin, "-y",
+            "-threads", "2",
             "-ss", str(start_time),
             "-to", str(end_time),
             "-i", str(source_video),
@@ -119,7 +121,7 @@ def render_clip(
             ])
         cmd.extend([
             "-c:v", "libx264",
-            "-preset", "fast",
+            "-preset", "veryfast",
             "-crf", "22",
             "-c:a", "aac",
             "-b:a", "192k",
