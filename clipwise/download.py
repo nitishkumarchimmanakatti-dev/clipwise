@@ -95,11 +95,6 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
         "outtmpl": video_target_pattern,
         "noplaylist": True,
         "merge_output_format": "mp4",
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios", "mweb"],
-            }
-        },
         "quiet": False,
         "no_warnings": False,
         "postprocessors": [
@@ -110,17 +105,25 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
         ],
     }
 
-    # Support optional cookies file for datacenter bypassing if present
+    # Support cookies from file or environment variable for datacenter bypassing
     import os
     cookies_env = os.getenv("YOUTUBE_COOKIES")
-    cookies_file = Path("/app/cookies.txt")
-    if cookies_env and not cookies_file.exists():
+    candidate_cookie_paths = [
+        Path("/app/cookies.txt"),
+        Path("cookies.txt"),
+        DOWNLOADS_DIR / "cookies.txt"
+    ]
+    cookies_file = next((p for p in candidate_cookie_paths if p.exists()), None)
+
+    if cookies_env:
+        target_path = Path("/app/cookies.txt") if Path("/app").exists() else DOWNLOADS_DIR / "cookies.txt"
         try:
-            cookies_file.write_text(cookies_env)
+            target_path.write_text(cookies_env)
+            cookies_file = target_path
         except Exception:
             pass
 
-    if cookies_file.exists():
+    if cookies_file and cookies_file.exists():
         ydl_opts["cookiefile"] = str(cookies_file)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:

@@ -125,9 +125,16 @@ async def start_generation(req: GenerateRequest, background_tasks: BackgroundTas
             tasks[task_id]["current_step"] = "Finished successfully!"
             tasks[task_id]["clips"] = clips
         except Exception as err:
+            err_str = str(err)
             tasks[task_id]["status"] = "failed"
-            tasks[task_id]["error"] = str(err)
-            tasks[task_id]["logs"].append(f"ERROR: {err}")
+            tasks[task_id]["error"] = err_str
+            tasks[task_id]["logs"].append(f"ERROR: {err_str}")
+            if "not a bot" in err_str.lower() or "429" in err_str.lower() or "sign in" in err_str.lower():
+                tasks[task_id]["logs"].append(
+                    "💡 NOTE: Cloud datacenter IPs (like Railway) are frequently rate-limited by YouTube. "
+                    "For 100% reliable processing, run Clipwise locally on your Mac (`python main.py ui`), "
+                    "or add YouTube session cookies via the `YOUTUBE_COOKIES` environment variable."
+                )
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
