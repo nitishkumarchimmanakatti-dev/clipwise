@@ -64,6 +64,9 @@
         </div>
       </div>
       <div class="nav-actions">
+        <button id="openCookiesBtn" class="btn btn-secondary">
+          <span>🍪 Cookies</span>
+        </button>
         <button id="viewHistoryBtn" class="btn btn-secondary">
           <span>📁 Library</span>
         </button>
@@ -80,8 +83,13 @@
         </div>
 
         <div class="generator-card">
+          <div class="tabs-header">
+            <button type="button" id="tabYoutube" class="tab-btn active"><span>📺 YouTube URL</span></button>
+            <button type="button" id="tabUpload" class="tab-btn"><span>📤 Upload Video (MP4 / MOV)</span></button>
+          </div>
+
           <form id="generateForm" class="generator-form">
-            <div class="input-group">
+            <div id="youtubeInputGroup" class="input-group">
               <span class="input-icon">🔗</span>
               <input 
                 type="url" 
@@ -91,6 +99,19 @@
               />
               <button type="submit" id="submitBtn" class="btn btn-primary">
                 <span>Generate Clips</span>
+                <span class="btn-arrow">→</span>
+              </button>
+            </div>
+
+            <div id="uploadInputGroup" class="input-group hidden">
+              <span class="input-icon">📁</span>
+              <input 
+                type="file" 
+                id="videoFile" 
+                accept="video/mp4,video/quicktime,video/webm,video/mkv"
+              />
+              <button type="button" id="uploadSubmitBtn" class="btn btn-primary">
+                <span>Upload & Generate</span>
                 <span class="btn-arrow">→</span>
               </button>
             </div>
@@ -162,6 +183,27 @@
         </div>
       </section>
     </main>
+
+    <!-- Cookies Modal -->
+    <div id="cookiesModal" class="modal hidden">
+      <div class="modal-content cookies-modal-content">
+        <div class="modal-header">
+          <h3>🍪 YouTube Bot Bypass / Cookies</h3>
+          <button id="closeCookiesBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="cookies-body">
+          <p class="cookies-desc">
+            Cloud servers (Railway, AWS) are frequently challenged by YouTube bot filters. 
+            Paste your YouTube session cookies (from the free <strong>Get cookies.txt LOCALLY</strong> extension) below to authenticate all server downloads.
+          </p>
+          <textarea id="cookiesInput" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com TRUE / FALSE 1750000000 SID ..."></textarea>
+          <div class="cookies-actions">
+            <button id="saveCookiesBtn" class="btn btn-primary">Save Cookies & Enable</button>
+            <span id="cookiesStatus" class="cookies-status-msg"></span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- History Drawer / Modal -->
     <div id="historyModal" class="modal hidden">

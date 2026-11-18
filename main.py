@@ -120,6 +120,114 @@ def run_pipeline(
     return clips_info
 
 
+def run_pipeline_for_file(
+    video_file_path: Path,
+    title: str = "Uploaded Video",
+    max_clips: int = DEFAULT_MAX_CLIPS,
+    force: bool = False,
+    mode: str = DEFAULT_RENDER_MODE,
+    use_llm: bool = False,
+    progress_callback=None,
+):
+    """Run pipeline directly from an uploaded or local video file."""
+    import subprocess
+    ensure_ffmpeg()
+
+    def notify(step: str, percent: int, message: str):
+        if progress_callback:
+            progress_callback(step, percent, message)
+        else:
+            print(f"[{percent:3d}%] [{step.upper()}] {message}")
+
+    import hashlib
+    video_id = hashlib.md5(video_file_path.name.encode()).hexdigest()[:11]
+    video_output_dir = OUTPUT_DIR / video_id
+    video_output_dir.mkdir(parents=True, exist_ok=True)
+    audio_file = video_output_dir / "audio.wav"
+
+    notify("audio", 15, "Extracting audio from uploaded video...")
+    cmd = [
+        "ffmpeg", "-y", "-i", str(video_file_path),
+        "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+        str(audio_file)
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Probe duration
+    probe_cmd = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(video_file_path)
+    ]
+    try:
+        dur_res = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
+        duration = float(dur_res.stdout.strip())
+    except Exception:
+        duration = 60.0
+
+    metadata = {
+        "id": video_id,
+        "title": title,
+        "duration": duration,
+        "channel": "Upload",
+        "webpage_url": "",
+    }
+
+    notify("transcribe", 40, "Transcribing speech and extracting word timestamps with faster-whisper...")
+    transcript_file = video_output_dir / "transcript.json"
+    transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force)
+    notify("transcribe", 60, f"Transcribed {len(transcript.get('segments', []))} speech segments")
+
+    notify("segment", 65, "Finding candidate segments aligned to sentence boundaries (15-60s)...")
+    candidates = generate_candidate_segments(transcript)
+    if not candidates:
+        notify("error", 100, "No valid segments between 15 and 60 seconds found.")
+        append_to_run_log(video_id, "upload", 0, "FAILED", "No valid speech segments found")
+        return []
+
+    notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates...")
+    top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips)
+    notify("score", 75, f"Selected top {len(top_candidates)} engaging clips")
+
+    clips_info = []
+    total = len(top_candidates)
+    for idx, cand in enumerate(top_candidates, start=1):
+        clip_id = f"{video_id}_clip_{idx:02d}"
+        notify("render", 75 + int((idx / total) * 20), f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
+        clip_mp4 = video_output_dir / f"{clip_id}.mp4"
+        clip_srt = video_output_dir / f"{clip_id}.srt"
+        clip_meta_file = video_output_dir / f"{clip_id}_metadata.json"
+
+        meta = create_clip_metadata(cand, metadata, clip_id)
+        with open(clip_meta_file, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+
+        render_clip(
+            source_video=video_file_path,
+            candidate=cand,
+            output_mp4=clip_mp4,
+            output_srt=clip_srt,
+            mode=mode,
+            burn_captions=True,
+            force=force,
+        )
+
+        clips_info.append({
+            "clip_id": clip_id,
+            "title": meta["title"],
+            "hook_score": cand["hook_score"],
+            "duration": cand["duration"],
+            "mp4_url": f"/media/{video_id}/{clip_id}.mp4",
+            "srt_url": f"/media/{video_id}/{clip_id}.srt",
+            "metadata": meta,
+            "status": "pending",
+        })
+
+    init_review_sheet(video_output_dir, clips_info)
+    append_to_run_log(video_id, "upload", len(clips_info), "SUCCESS", f"Generated {len(clips_info)} clips")
+    notify("complete", 100, f"Complete! All clips saved to {video_output_dir}")
+    return clips_info
+
+
 def cli_review():
     """CLI handler for listing pending clips."""
     pending = get_all_pending_clips()

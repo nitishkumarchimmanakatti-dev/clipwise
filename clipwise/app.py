@@ -6,7 +6,7 @@ import threading
 import uuid
 import json
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,15 +17,15 @@ from clipwise.config import OUTPUT_DIR, DOWNLOADS_DIR, ensure_ffmpeg
 from clipwise.download import validate_youtube_url
 from clipwise.review import set_clip_status, load_review_sheet, get_all_pending_clips
 try:
-    from main import run_pipeline
+    from main import run_pipeline, run_pipeline_for_file
 except ImportError:
     try:
-        from clipwise.main import run_pipeline
+        from clipwise.main import run_pipeline, run_pipeline_for_file
     except ImportError:
         import sys
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        from main import run_pipeline
+        from main import run_pipeline, run_pipeline_for_file
 
 app = FastAPI(title="Clipwise Web", description="Turn long YouTube videos into viral shorts")
 
@@ -55,6 +55,89 @@ class GenerateRequest(BaseModel):
 
 class StatusUpdateRequest(BaseModel):
     status: str  # 'approved', 'rejected', 'pending'
+
+
+class CookieUpdateRequest(BaseModel):
+    cookies: str
+
+
+@app.post("/api/cookies")
+async def save_youtube_cookies(req: CookieUpdateRequest):
+    """Save user-provided YouTube cookies string to bypass datacenter bot checks."""
+    try:
+        content = req.cookies.strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="Cookies content cannot be empty.")
+        
+        target_path = Path("/app/cookies.txt") if Path("/app").exists() else DOWNLOADS_DIR / "cookies.txt"
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+        return {"status": "ok", "message": f"Cookies saved successfully to {target_path.name}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/upload")
+async def upload_and_process_video(
+    file: UploadFile = File(...),
+    max_clips: int = Form(5),
+    mode: str = Form("blur"),
+    use_llm: bool = Form(False),
+):
+    """Directly upload a video file (.mp4, .mov, .mkv, .webm) and process it into clips."""
+    try:
+        ensure_ffmpeg()
+        task_id = str(uuid.uuid4())
+        upload_dir = DOWNLOADS_DIR / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        saved_file = upload_dir / f"{task_id}_{file.filename}"
+        with open(saved_file, "wb") as f:
+            f.write(await file.read())
+        
+        tasks[task_id] = {
+            "task_id": task_id,
+            "video_id": task_id[:11],
+            "url": file.filename,
+            "status": "processing",
+            "progress": 5,
+            "current_step": "Saved uploaded file, starting pipeline...",
+            "logs": ["Job queued for uploaded file."],
+            "clips": [],
+            "error": None,
+        }
+
+        def upload_worker():
+            def on_progress(step: str, percent: int, msg: str):
+                tasks[task_id]["progress"] = percent
+                tasks[task_id]["current_step"] = msg
+                tasks[task_id]["logs"].append(f"[{percent}%] {msg}")
+
+            try:
+                clips = run_pipeline_for_file(
+                    video_file_path=saved_file,
+                    title=file.filename,
+                    max_clips=max_clips,
+                    force=True,
+                    mode=mode,
+                    use_llm=use_llm,
+                    progress_callback=on_progress,
+                )
+                tasks[task_id]["status"] = "completed"
+                tasks[task_id]["progress"] = 100
+                tasks[task_id]["current_step"] = "Finished successfully!"
+                tasks[task_id]["clips"] = clips
+            except Exception as err:
+                tasks[task_id]["status"] = "failed"
+                tasks[task_id]["error"] = str(err)
+                tasks[task_id]["logs"].append(f"ERROR: {err}")
+
+        thread = threading.Thread(target=upload_worker, daemon=True)
+        thread.start()
+
+        return {"task_id": task_id, "video_id": task_id[:11]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.api_route("/robots.txt", methods=["GET", "HEAD"])

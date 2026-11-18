@@ -252,6 +252,124 @@ closeModalBtn.addEventListener('click', () => {
   historyModal.classList.add('hidden');
 });
 
+// Tab Switching (YouTube vs Upload)
+const tabYoutube = document.getElementById('tabYoutube');
+const tabUpload = document.getElementById('tabUpload');
+const youtubeInputGroup = document.getElementById('youtubeInputGroup');
+const uploadInputGroup = document.getElementById('uploadInputGroup');
+const videoFileInput = document.getElementById('videoFile');
+const uploadSubmitBtn = document.getElementById('uploadSubmitBtn');
+
+if (tabYoutube && tabUpload) {
+  tabYoutube.addEventListener('click', () => {
+    tabYoutube.classList.add('active');
+    tabUpload.classList.remove('active');
+    youtubeInputGroup.classList.remove('hidden');
+    uploadInputGroup.classList.add('hidden');
+  });
+
+  tabUpload.addEventListener('click', () => {
+    tabUpload.classList.add('active');
+    tabYoutube.classList.remove('active');
+    uploadInputGroup.classList.remove('hidden');
+    youtubeInputGroup.classList.add('hidden');
+  });
+}
+
+// File Upload Handler
+if (uploadSubmitBtn) {
+  uploadSubmitBtn.addEventListener('click', async () => {
+    const file = videoFileInput.files[0];
+    if (!file) {
+      alert('Please select a video file (MP4, MOV, WEBM) first.');
+      return;
+    }
+
+    uploadSubmitBtn.disabled = true;
+    uploadSubmitBtn.innerHTML = '<span>Uploading...</span>';
+    progressSection.classList.remove('hidden');
+    resultsSection.classList.add('hidden');
+    logsConsole.innerHTML = '';
+    updateProgress(5, 'Uploading local video...');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('max_clips', maxClipsSelect.value);
+    formData.append('mode', renderModeSelect.value);
+    formData.append('use_llm', useLlmCheckbox.checked);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Upload failed');
+      }
+
+      const data = await res.json();
+      currentTaskId = data.task_id;
+      startPolling(currentTaskId, data.video_id);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+      uploadSubmitBtn.disabled = false;
+      uploadSubmitBtn.innerHTML = '<span>Upload & Generate</span><span class="btn-arrow">→</span>';
+      progressSection.classList.add('hidden');
+    }
+  });
+}
+
+// Cookies Modal Handlers
+const openCookiesBtn = document.getElementById('openCookiesBtn');
+const cookiesModal = document.getElementById('cookiesModal');
+const closeCookiesBtn = document.getElementById('closeCookiesBtn');
+const saveCookiesBtn = document.getElementById('saveCookiesBtn');
+const cookiesInput = document.getElementById('cookiesInput');
+const cookiesStatus = document.getElementById('cookiesStatus');
+
+if (openCookiesBtn && cookiesModal) {
+  openCookiesBtn.addEventListener('click', () => {
+    cookiesModal.classList.remove('hidden');
+    cookiesStatus.textContent = '';
+  });
+
+  closeCookiesBtn.addEventListener('click', () => {
+    cookiesModal.classList.add('hidden');
+  });
+
+  saveCookiesBtn.addEventListener('click', async () => {
+    const content = cookiesInput.value.trim();
+    if (!content) {
+      alert('Please paste cookie content.');
+      return;
+    }
+    saveCookiesBtn.disabled = true;
+    saveCookiesBtn.textContent = 'Saving...';
+    try {
+      const res = await fetch('/api/cookies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookies: content })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to save');
+      cookiesStatus.style.color = '#10b981';
+      cookiesStatus.textContent = '✓ Saved! Server now authenticated.';
+      setTimeout(() => {
+        cookiesModal.classList.add('hidden');
+      }, 1500);
+    } catch (err) {
+      cookiesStatus.style.color = '#ef4444';
+      cookiesStatus.textContent = `Error: ${err.message}`;
+    } finally {
+      saveCookiesBtn.disabled = false;
+      saveCookiesBtn.textContent = 'Save Cookies & Enable';
+    }
+  });
+}
+
 function copyText(text) {
   navigator.clipboard.writeText(text);
   alert(`Copied ${text} to clipboard!`);
