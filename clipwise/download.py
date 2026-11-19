@@ -130,6 +130,16 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
         ydl_opts["cookiefile"] = str(cookies_file)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # Extract metadata first to check if video is an ongoing live stream
+        info_check = ydl.extract_info(url, download=False)
+        if not info_check:
+            raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
+        if info_check.get("is_live") or info_check.get("live_status") == "is_live":
+            raise ValueError(
+                "This YouTube video is currently an ACTIVE LIVE STREAM! "
+                "Clipwise generates clips from completed videos or finished live stream recordings. "
+                "Please use a completed video or wait until this stream ends."
+            )
         info = ydl.extract_info(url, download=True)
         if not info:
             raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
