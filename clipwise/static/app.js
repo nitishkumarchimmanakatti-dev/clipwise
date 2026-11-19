@@ -73,6 +73,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const viewStorageBtn = document.getElementById('viewStorageBtn');
   const storageModal = document.getElementById('storageModal');
   const closeStorageModalBtn = document.getElementById('closeStorageModalBtn');
+
+  // YouTube Channel Automation
+  const youtubeConnectBtn = document.getElementById('youtubeConnectBtn');
+  const youtubeBtnText = document.getElementById('youtubeBtnText');
+  const youtubeModal = document.getElementById('youtubeModal');
+  const closeYoutubeModalBtn = document.getElementById('closeYoutubeModalBtn');
+  const ytStatusText = document.getElementById('ytStatusText');
+  const ytAuthLink = document.getElementById('ytAuthLink');
+  const ytAuthCodeInput = document.getElementById('ytAuthCodeInput');
+  const ytSubmitCodeBtn = document.getElementById('ytSubmitCodeBtn');
+  const ytClientIdInput = document.getElementById('ytClientIdInput');
+  const ytClientSecretInput = document.getElementById('ytClientSecretInput');
+  const ytSecretJsonInput = document.getElementById('ytSecretJsonInput');
+  const ytSaveCredsBtn = document.getElementById('ytSaveCredsBtn');
+  const autoUploadOnApprove = document.getElementById('autoUploadOnApprove');
+  const uploadToYoutubeBtn = document.getElementById('uploadToYoutubeBtn');
+  const youtubeUploadStatus = document.getElementById('youtubeUploadStatus');
   const storageMetrics = document.getElementById('storageMetrics');
   const triggerCleanupBtn = document.getElementById('triggerCleanupBtn');
 
@@ -458,6 +475,15 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadSrtBtn.href = clip.srt_url;
     downloadSrtBtn.setAttribute('download', `${clip.clip_id}.srt`);
 
+    // Set YouTube status in review modal
+    if (clip.youtube_status === 'uploaded' && clip.youtube_url) {
+      youtubeUploadStatus.innerHTML = `✅ Uploaded to YouTube! <a href="${clip.youtube_url}" target="_blank" style="color: #63b3ed; text-decoration: underline; font-weight: 600;">View Short ↗</a>`;
+      uploadToYoutubeBtn.textContent = '🔄 Re-upload to YouTube';
+    } else {
+      youtubeUploadStatus.innerHTML = '';
+      uploadToYoutubeBtn.textContent = '🚀 Upload to YouTube Shorts (Public)';
+    }
+
     reviewModal.classList.remove('hidden');
     reviewVideoPlayer.play().catch(() => {});
   }
@@ -470,24 +496,64 @@ document.addEventListener('DOMContentLoaded', () => {
   // Approve / Reject
   approveBtn.addEventListener('click', async () => {
     if (!currentActiveClip) return;
-    await updateClipStatus(currentActiveClip.clip_id, 'approved');
+    const autoUpload = autoUploadOnApprove ? autoUploadOnApprove.checked : false;
+    await updateClipStatus(currentActiveClip.clip_id, 'approved', autoUpload);
     reviewModal.classList.add('hidden');
   });
 
   rejectBtn.addEventListener('click', async () => {
     if (!currentActiveClip) return;
-    await updateClipStatus(currentActiveClip.clip_id, 'rejected');
+    await updateClipStatus(currentActiveClip.clip_id, 'rejected', false);
     reviewModal.classList.add('hidden');
   });
 
-  async function updateClipStatus(clipId, newStatus) {
+  // Dedicated YouTube Upload Button
+  if (uploadToYoutubeBtn) {
+    uploadToYoutubeBtn.addEventListener('click', async () => {
+      if (!currentActiveClip || !currentVideoId) return;
+      uploadToYoutubeBtn.disabled = true;
+      youtubeUploadStatus.innerHTML = '⏳ Uploading to YouTube Shorts...';
+      try {
+        const res = await fetch('/api/youtube/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            video_id: currentVideoId,
+            clip_id: currentActiveClip.clip_id,
+            title: reviewTitleInput.value.trim(),
+            description: reviewDescInput.value.trim(),
+            privacy_status: 'public'
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+        youtubeUploadStatus.innerHTML = `✅ Uploaded! <a href="${data.result.url}" target="_blank" style="color: #63b3ed; text-decoration: underline; font-weight: 600;">Open Short ↗</a>`;
+        alert(`🎉 Successfully uploaded to YouTube Shorts!\n\nLink: ${data.result.url}`);
+        loadClipsForVideo(currentVideoId);
+      } catch (err) {
+        youtubeUploadStatus.innerHTML = `<span style="color: #fc8181;">❌ ${err.message}</span>`;
+        alert(`YouTube Upload Failed:\n${err.message}`);
+      } finally {
+        uploadToYoutubeBtn.disabled = false;
+      }
+    });
+  }
+
+  async function updateClipStatus(clipId, newStatus, autoUpload = false) {
     try {
       const res = await fetch(`/api/clips/${clipId}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus, auto_upload: autoUpload })
       });
       if (res.ok) {
+        const data = await res.json();
+        if (data.upload && data.upload.url) {
+          alert(`🎉 Clip approved and automatically uploaded to YouTube Shorts!\n\nLink: ${data.upload.url}`);
+        } else if (data.upload && data.upload.error) {
+          alert(`Clip approved, but YouTube upload failed:\n${data.upload.error}`);
+        }
         if (currentVideoId) loadClipsForVideo(currentVideoId);
       }
     } catch (e) {
@@ -684,6 +750,129 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
+
+  // YouTube Channel Automation Handlers
+  if (youtubeConnectBtn) {
+    youtubeConnectBtn.addEventListener('click', () => {
+      youtubeModal.classList.remove('hidden');
+      checkYouTubeStatus();
+    });
+  }
+
+  if (closeYoutubeModalBtn) {
+    closeYoutubeModalBtn.addEventListener('click', () => {
+      youtubeModal.classList.add('hidden');
+    });
+  }
+
+  async function checkYouTubeStatus() {
+    try {
+      const res = await fetch('/api/youtube/status');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.authenticated) {
+        if (youtubeBtnText) youtubeBtnText.textContent = `🟢 ${data.channel_title || 'YouTube'}`;
+        if (ytStatusText) {
+          ytStatusText.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px;">
+              ${data.thumbnail ? `<img src="${data.thumbnail}" style="width: 44px; height: 44px; border-radius: 50%;">` : ''}
+              <div>
+                <strong style="color: #68d391; font-size: 1rem;">✅ Connected: ${escapeHtml(data.channel_title)}</strong>
+                <div style="font-size: 0.82rem; color: #a0aec0;">${data.subscriber_count || '0'} subscribers • ${data.video_count || '0'} videos</div>
+              </div>
+            </div>
+          `;
+        }
+      } else {
+        if (youtubeBtnText) youtubeBtnText.textContent = '📺 Connect YouTube';
+        if (ytStatusText) {
+          ytStatusText.innerHTML = `
+            <span style="color: #ecc94b; font-weight: 600;">⚪ Not Connected to YouTube</span>
+            <div style="font-size: 0.82rem; color: #a0aec0; margin-top: 4px;">Click the button below to authorize Clipwise with your YouTube account.</div>
+          `;
+        }
+        fetchAuthUrl();
+      }
+    } catch (e) {
+      console.error('Failed to check YouTube status:', e);
+    }
+  }
+
+  async function fetchAuthUrl() {
+    try {
+      const res = await fetch('/api/youtube/auth/url', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (ytAuthLink) ytAuthLink.href = data.auth_url;
+      }
+    } catch (e) {
+      console.error('Failed fetching auth url:', e);
+    }
+  }
+
+  if (ytSubmitCodeBtn) {
+    ytSubmitCodeBtn.addEventListener('click', async () => {
+      const code = ytAuthCodeInput.value.trim();
+      if (!code) {
+        alert('Please paste the Google Authorization code first.');
+        return;
+      }
+      ytSubmitCodeBtn.disabled = true;
+      try {
+        const res = await fetch('/api/youtube/auth/callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Authorization failed');
+        alert('🎉 YouTube channel successfully connected!');
+        ytAuthCodeInput.value = '';
+        checkYouTubeStatus();
+      } catch (err) {
+        alert(`Authentication Error: ${err.message}`);
+      } finally {
+        ytSubmitCodeBtn.disabled = false;
+      }
+    });
+  }
+
+  if (ytSaveCredsBtn) {
+    ytSaveCredsBtn.addEventListener('click', async () => {
+      const clientId = ytClientIdInput.value.trim();
+      const clientSecret = ytClientSecretInput.value.trim();
+      const secretJson = ytSecretJsonInput.value.trim();
+
+      if (!secretJson && (!clientId || !clientSecret)) {
+        alert('Please enter Client ID & Secret or paste client_secret.json content.');
+        return;
+      }
+
+      ytSaveCredsBtn.disabled = true;
+      try {
+        const res = await fetch('/api/youtube/auth/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: clientId || null,
+            client_secret: clientSecret || null,
+            credentials_json: secretJson || null
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed saving credentials');
+        alert('Credentials saved! You can now authorize your channel.');
+        fetchAuthUrl();
+      } catch (err) {
+        alert(`Error saving credentials: ${err.message}`);
+      } finally {
+        ytSaveCredsBtn.disabled = false;
+      }
+    });
+  }
+
+  // Initial YouTube connection check
+  checkYouTubeStatus();
 
   function escapeHtml(text) {
     if (!text) return '';

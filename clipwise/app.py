@@ -54,6 +54,14 @@ from clipwise.review import (
 from clipwise.music import list_available_tracks, get_track_by_id, get_track_for_mood
 from clipwise.storage import get_storage_stats, clean_expired_originals, get_next_render_version
 from clipwise.render import render_clip
+from clipwise.youtube_upload import (
+    check_channel_auth_status,
+    get_oauth_authorization_url,
+    exchange_oauth_code,
+    upload_clip_to_youtube,
+    save_client_secret_file,
+    is_youtube_configured,
+)
 
 try:
     from main import run_pipeline, run_pipeline_for_file
@@ -101,6 +109,27 @@ class GenerateRequest(BaseModel):
 
 class StatusUpdateRequest(BaseModel):
     status: str  # 'approved', 'rejected', 'pending'
+    auto_upload: Optional[bool] = False
+
+
+class YouTubeUploadRequest(BaseModel):
+    video_id: str
+    clip_id: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    privacy_status: Optional[str] = "public"
+
+
+class YouTubeCredentialsRequest(BaseModel):
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    credentials_json: Optional[str] = None
+
+
+class YouTubeCallbackRequest(BaseModel):
+    code: str
+    redirect_uri: Optional[str] = None
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -433,7 +462,141 @@ async def update_clip_status_api(
     success = set_clip_status(clip_id, req.status)
     if not success:
         raise HTTPException(status_code=404, detail="Clip not found")
-    return {"clip_id": clip_id, "status": req.status}
+
+    upload_result = None
+    if req.status == "approved" and req.auto_upload:
+        # Search for clip file across outputs
+        for vdir in OUTPUT_DIR.iterdir():
+            if not vdir.is_dir():
+                continue
+            meta_path = vdir / f"{clip_id}_metadata.json"
+            if meta_path.exists():
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                clip_path = vdir / f"{clip_id}.mp4"
+                if not clip_path.exists():
+                    versioned = list(vdir.glob(f"{clip_id}_v*.mp4"))
+                    if versioned:
+                        versioned.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                        clip_path = versioned[0]
+                if clip_path.exists():
+                    try:
+                        upload_result = upload_clip_to_youtube(
+                            video_path=clip_path,
+                            title=meta.get("title", "Viral Short"),
+                            description=meta.get("description", ""),
+                            tags=meta.get("hashtags", []),
+                            privacy_status="public",
+                        )
+                        meta["youtube_video_id"] = upload_result.get("video_id")
+                        meta["youtube_url"] = upload_result.get("url")
+                        meta["youtube_uploaded_at"] = upload_result.get("uploaded_at")
+                        meta["youtube_status"] = "uploaded"
+                        with open(meta_path, "w", encoding="utf-8") as f:
+                            json.dump(meta, f, indent=2, ensure_ascii=False)
+                    except Exception as ex:
+                        print(f"[YouTube Auto-Upload Error] {ex}")
+                        upload_result = {"error": str(ex)}
+                break
+
+    return {"clip_id": clip_id, "status": req.status, "upload": upload_result}
+
+
+# --- YOUTUBE DATA API AUTOMATION ENDPOINTS ---
+
+@app.get("/api/youtube/status")
+async def get_youtube_status_api(_auth: None = Depends(require_auth)):
+    """Check YouTube channel connection and return profile info."""
+    return check_channel_auth_status()
+
+
+@app.post("/api/youtube/auth/url")
+async def get_youtube_auth_url_api(redirect_uri: str = "urn:ietf:wg:oauth:2.0:oob", _auth: None = Depends(require_auth)):
+    """Get Google OAuth consent URL."""
+    try:
+        return get_oauth_authorization_url(redirect_uri)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/youtube/auth/callback")
+async def handle_youtube_callback_api(req: YouTubeCallbackRequest, _auth: None = Depends(require_auth)):
+    """Exchange OAuth code for tokens."""
+    try:
+        return exchange_oauth_code(req.code, req.redirect_uri or "urn:ietf:wg:oauth:2.0:oob")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/youtube/auth/credentials")
+async def save_youtube_credentials_api(req: YouTubeCredentialsRequest, _auth: None = Depends(require_auth)):
+    """Save client_secret.json or client ID/Secret."""
+    try:
+        if req.credentials_json:
+            save_client_secret_file(req.credentials_json)
+            return {"status": "ok", "message": "Saved client_secret.json successfully"}
+        elif req.client_id and req.client_secret:
+            cfg = {
+                "installed": {
+                    "client_id": req.client_id.strip(),
+                    "client_secret": req.client_secret.strip(),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"],
+                }
+            }
+            save_client_secret_file(json.dumps(cfg))
+            return {"status": "ok", "message": "Saved client credentials successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Missing credentials data.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/youtube/upload")
+async def upload_to_youtube_api(req: YouTubeUploadRequest, _auth: None = Depends(require_auth)):
+    """Upload a specific clip to YouTube Shorts."""
+    video_dir = OUTPUT_DIR / req.video_id
+    meta_path = video_dir / f"{req.clip_id}_metadata.json"
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail="Clip metadata not found")
+
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+
+    # Find the rendered clip file
+    clip_path = video_dir / f"{req.clip_id}.mp4"
+    if not clip_path.exists():
+        versioned = list(video_dir.glob(f"{req.clip_id}_v*.mp4"))
+        if versioned:
+            versioned.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            clip_path = versioned[0]
+        else:
+            raise HTTPException(status_code=404, detail="Rendered clip video file not found")
+
+    title = req.title or meta.get("title") or "Viral Short"
+    description = req.description or meta.get("description") or ""
+    tags = req.tags if req.tags is not None else meta.get("hashtags", [])
+    privacy = req.privacy_status or "public"
+
+    try:
+        result = upload_clip_to_youtube(
+            video_path=clip_path,
+            title=title,
+            description=description,
+            tags=tags,
+            privacy_status=privacy,
+        )
+        meta["youtube_video_id"] = result.get("video_id")
+        meta["youtube_url"] = result.get("url")
+        meta["youtube_uploaded_at"] = result.get("uploaded_at")
+        meta["youtube_status"] = "uploaded"
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"YouTube upload failed: {str(e)}")
 
 
 @app.post("/api/clips/{video_id}/{clip_id}/metadata")

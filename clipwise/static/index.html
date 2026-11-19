@@ -38,6 +38,9 @@
         <button id="viewStorageBtn" class="btn btn-secondary">
           <span>💾 Storage</span>
         </button>
+        <button id="youtubeConnectBtn" class="btn btn-secondary">
+          <span id="youtubeBtnText">📺 YouTube Channel</span>
+        </button>
         <button id="authBtn" class="btn btn-secondary">
           <span id="authBtnText">🔒 Login</span>
         </button>
@@ -259,10 +262,74 @@
               <button id="rejectBtn" class="btn btn-danger">✗ Reject Clip</button>
             </div>
 
+            <!-- YouTube Shorts Upload Section -->
+            <div class="review-youtube-section" style="margin-top: 15px; padding: 12px; border-radius: 8px; background: rgba(255, 0, 0, 0.08); border: 1px solid rgba(255, 0, 0, 0.2);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer; color: #fff;">
+                  <input type="checkbox" id="autoUploadOnApprove" checked />
+                  <span>🚀 Auto-upload to YouTube Shorts when Approved</span>
+                </label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="uploadToYoutubeBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #FF0000 0%, #CC0000 100%); border: none;">
+                  <span>🚀 Upload to YouTube Shorts (Public)</span>
+                </button>
+                <div id="youtubeUploadStatus" style="font-size: 0.85rem; color: #a0aec0;"></div>
+              </div>
+            </div>
+
             <div class="review-download-actions">
               <a id="downloadMp4Btn" class="btn btn-secondary" download>Download MP4</a>
               <a id="downloadSrtBtn" class="btn btn-secondary" download>Download SRT</a>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- YouTube Channel Settings Modal -->
+    <div id="youtubeModal" class="modal hidden">
+      <div class="modal-content auth-modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+          <h3>📺 YouTube Channel Automation</h3>
+          <button id="closeYoutubeModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="youtube-modal-body" style="padding: 16px 0;">
+          <div id="ytChannelInfo" style="padding: 14px; border-radius: 8px; background: rgba(255,255,255,0.05); margin-bottom: 16px;">
+            <div id="ytStatusText">Checking connection...</div>
+          </div>
+
+          <div class="yt-tab-pane">
+            <h4 style="margin-bottom: 8px;">Connect Your YouTube Channel</h4>
+            <p class="auth-hint" style="margin-bottom: 14px; font-size: 0.85rem; color: #a0aec0;">
+              To automate uploads, Clipwise uses the official YouTube Data API v3 with Google OAuth 2.0. Videos will be uploaded directly as <strong>Public YouTube Shorts</strong> with auto-generated titles and hashtags.
+            </p>
+            
+            <div id="ytConnectSection">
+              <a id="ytAuthLink" href="#" target="_blank" class="btn btn-primary" style="display: inline-block; margin-bottom: 12px; text-decoration: none; background: #FF0000;">
+                🔑 Sign in with Google / Grant YouTube Access
+              </a>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <input type="text" id="ytAuthCodeInput" placeholder="Paste Google Authorization Code here..." style="flex: 1;" />
+                <button type="button" id="ytSubmitCodeBtn" class="btn btn-secondary">Connect</button>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+              <details>
+                <summary style="cursor: pointer; color: #cbd5e0; font-size: 0.88rem;">⚙️ Configure OAuth Credentials (client_secret.json)</summary>
+                <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                  <p style="font-size: 0.8rem; color: #a0aec0; margin: 0;">
+                    Enter your Google Cloud OAuth Client ID & Secret or paste the <code>client_secret.json</code> file content:
+                  </p>
+                  <input type="text" id="ytClientIdInput" placeholder="Google Client ID (.apps.googleusercontent.com)" />
+                  <input type="password" id="ytClientSecretInput" placeholder="Google Client Secret" />
+                  <textarea id="ytSecretJsonInput" placeholder="Or paste client_secret.json raw JSON here..." rows="3" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+                  <button type="button" id="ytSaveCredsBtn" class="btn btn-secondary">Save Credentials</button>
+                </div>
+              </details>
+            </div>
+
           </div>
         </div>
       </div>

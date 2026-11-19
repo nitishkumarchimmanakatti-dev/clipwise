@@ -9,3 +9,6 @@ output/
 downloads/
 clipwise_log.csv
 .DS_Store
+client_secret.json
+youtube_token.json
+cookies.txt
