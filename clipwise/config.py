@@ -19,7 +19,7 @@ MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "2000"))  # 2GB generou
 ORIGINALS_TTL_DAYS = int(os.getenv("ORIGINALS_TTL_DAYS", "14"))  # 14 days retention
 CLIPWISE_PASSWORD = os.getenv("CLIPWISE_PASSWORD", "")  # Empty means open/dev mode
 SESSION_SECRET = os.getenv("SESSION_SECRET", "clipwise-v2-super-secret-key-39824")
-ENABLE_YOUTUBE_URL = os.getenv("ENABLE_YOUTUBE_URL", "false").lower() in ("true", "1", "yes")
+ENABLE_YOUTUBE_URL = os.getenv("ENABLE_YOUTUBE_URL", "true").lower() in ("true", "1", "yes")
 
 # Caption Styling
 DEFAULT_CAPTION_COLOR = os.getenv("DEFAULT_CAPTION_COLOR", "#FFD700")  # Default warm gold

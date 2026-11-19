@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
+import clipwise.config as config
 from clipwise.config import (
     OUTPUT_DIR,
     ORIGINALS_DIR,
@@ -34,7 +35,6 @@ from clipwise.config import (
     ORIGINALS_TTL_DAYS,
     CLIPWISE_PASSWORD,
     DEFAULT_CAPTION_COLOR,
-    ENABLE_YOUTUBE_URL,
     ensure_ffmpeg,
 )
 from clipwise.auth import (
@@ -183,7 +183,7 @@ async def serve_index():
 async def get_app_config():
     """Return runtime configuration for frontend UI features."""
     return {
-        "enable_youtube": ENABLE_YOUTUBE_URL,
+        "enable_youtube": config.ENABLE_YOUTUBE_URL,
         "max_upload_size_mb": MAX_UPLOAD_SIZE_MB,
         "default_caption_color": DEFAULT_CAPTION_COLOR,
     }
@@ -198,7 +198,7 @@ async def start_generation(
     _auth: None = Depends(require_auth),
 ):
     """Submit a YouTube URL for processing (requires ownership confirmation)."""
-    if not ENABLE_YOUTUBE_URL:
+    if not config.ENABLE_YOUTUBE_URL:
         raise HTTPException(
             status_code=403,
             detail="YouTube URL processing is disabled on cloud deployment. Please use the Upload Video tab."

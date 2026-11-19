@@ -114,7 +114,7 @@ def download_video(
         "concurrent_fragment_downloads": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios"],
+                "player_client": ["tv_embedded", "ios", "android", "mweb", "web"],
             }
         },
         "js_runtimes": {"node": {}},
