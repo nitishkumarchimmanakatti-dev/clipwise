@@ -13,8 +13,8 @@ DOWNLOADS_DIR = ORIGINALS_DIR  # Alias for backward-compatibility
 LOG_FILE = CLIPWISE_DATA_DIR / "clipwise_log.csv"
 
 # Storage, Upload & Security Constraints
-MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "500"))
-ORIGINALS_TTL_DAYS = int(os.getenv("ORIGINALS_TTL_DAYS", "7"))
+MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "2000"))  # 2GB generous limit
+ORIGINALS_TTL_DAYS = int(os.getenv("ORIGINALS_TTL_DAYS", "14"))  # 14 days retention
 CLIPWISE_PASSWORD = os.getenv("CLIPWISE_PASSWORD", "")  # Empty means open/dev mode
 SESSION_SECRET = os.getenv("SESSION_SECRET", "clipwise-v2-super-secret-key-39824")
 

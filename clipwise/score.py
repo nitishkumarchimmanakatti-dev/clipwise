@@ -144,16 +144,52 @@ def score_candidates_with_llm(
     top_n: int = 10,
 ) -> List[Dict[str, Any]]:
     """Optional LLM enrichment for hook scoring and viral rationale (Gemini / OpenAI)."""
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not (gemini_key or openai_key) or not candidates:
         return candidates
 
     try:
-        # If LLM is configured, enrich the top candidates
-        # Implementation allows optional Gemini/OpenAI call
-        pass
+        import urllib.request
+        excerpts = []
+        for i, c in enumerate(candidates[:top_n]):
+            excerpts.append({
+                "index": i,
+                "text": c.get("text", "")[:300],
+                "duration": round(c.get("duration", 0), 1),
+                "rule_score": c.get("hook_score", 5.0),
+            })
+
+        prompt = (
+            "You are an expert viral YouTube Shorts editor. Rate the following clip excerpts "
+            "from 1.0 to 10.0 based on: 1) Hook strength in first 3 seconds, 2) Standalone clarity, "
+            "and 3) Payoff satisfaction. Return a JSON object formatted as: "
+            '{"ratings": [{"index": 0, "score": 8.5, "why": "Captivating question hook with clear takeaway"}]}.\n\n'
+            f"Excerpts:\n{json.dumps(excerpts)}"
+        )
+
+        if gemini_key:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            req_data = json.dumps({
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"response_mime_type": "application/json"}
+            }).encode("utf-8")
+            req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                text_resp = result["candidates"][0]["content"]["parts"][0]["text"]
+                data = json.loads(text_resp)
+                ratings = {item["index"]: item for item in data.get("ratings", [])}
+                for i, c in enumerate(candidates[:top_n]):
+                    if i in ratings:
+                        c["hook_score"] = float(ratings[i].get("score", c.get("hook_score", 5.0)))
+                        c["why_this_clip"] = f"[AI] {ratings[i].get('why', c.get('why_this_clip', ''))}"
+                candidates.sort(key=lambda x: x.get("hook_score", 0), reverse=True)
     except Exception:
+        # Gracefully preserve rule-based scoring on any network or API issue
         pass
+
     return candidates
 
 
