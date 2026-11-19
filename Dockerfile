@@ -1,13 +1,18 @@
 # Production Dockerfile for Clipwise Web Application
 FROM python:3.11-slim
 
-# Install system dependencies: ffmpeg with libass, git, curl, nodejs (for yt-dlp JS challenge solver)
+# Install system dependencies: ffmpeg with libass, git, curl, nodejs, fontconfig, and Noto Sans Devanagari fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libass-dev \
     git \
     curl \
     nodejs \
+    fontconfig \
+    fonts-noto-core \
+    fonts-noto-extra \
+    fonts-dejavu-core \
+    && fc-cache -fv \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

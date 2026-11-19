@@ -1,310 +1,261 @@
-/**
- * Clipwise Frontend Application Logic
- */
+// Clipwise v2 Frontend Engine
 
-let currentTaskId = null;
-let pollInterval = null;
-let allClips = [];
-let currentFilter = 'all';
+document.addEventListener('DOMContentLoaded', () => {
+  // Elements
+  const tabUpload = document.getElementById('tabUpload');
+  const tabYoutube = document.getElementById('tabYoutube');
+  const uploadInputGroup = document.getElementById('uploadInputGroup');
+  const youtubeInputGroup = document.getElementById('youtubeInputGroup');
+  const ownershipBanner = document.getElementById('ownershipBanner');
+  const ownershipCheckbox = document.getElementById('ownershipCheckbox');
+  const youtubeUrl = document.getElementById('youtubeUrl');
+  const videoFile = document.getElementById('videoFile');
+  const generateForm = document.getElementById('generateForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const uploadSubmitBtn = document.getElementById('uploadSubmitBtn');
+  const maxClips = document.getElementById('maxClips');
+  const renderMode = document.getElementById('renderMode');
+  const captionColorSelect = document.getElementById('captionColorSelect');
+  const useLlm = document.getElementById('useLlm');
 
-// DOM Elements
-const generateForm = document.getElementById('generateForm');
-const youtubeUrlInput = document.getElementById('youtubeUrl');
-const maxClipsSelect = document.getElementById('maxClips');
-const renderModeSelect = document.getElementById('renderMode');
-const useLlmCheckbox = document.getElementById('useLlm');
-const submitBtn = document.getElementById('submitBtn');
+  const progressSection = document.getElementById('progressSection');
+  const progressBar = document.getElementById('progressBar');
+  const progressPercentage = document.getElementById('progressPercentage');
+  const currentStepText = document.getElementById('currentStepText');
+  const elapsedTimer = document.getElementById('elapsedTimer');
+  const cancelJobBtn = document.getElementById('cancelJobBtn');
+  const logsConsole = document.getElementById('logsConsole');
 
-const progressSection = document.getElementById('progressSection');
-const progressBar = document.getElementById('progressBar');
-const progressPercentage = document.getElementById('progressPercentage');
-const currentStepText = document.getElementById('currentStepText');
-const logsConsole = document.getElementById('logsConsole');
-const elapsedTimer = document.getElementById('elapsedTimer');
+  const resultsSection = document.getElementById('resultsSection');
+  const clipsGrid = document.getElementById('clipsGrid');
+  const downloadApprovedZipBtn = document.getElementById('downloadApprovedZipBtn');
+  const filterPills = document.querySelectorAll('.filter-pills .pill');
 
-let startTime = null;
-let timerInterval = null;
+  // Modals
+  const reviewModal = document.getElementById('reviewModal');
+  const closeReviewModalBtn = document.getElementById('closeReviewModalBtn');
+  const reviewVideoPlayer = document.getElementById('reviewVideoPlayer');
+  const reviewClipTitle = document.getElementById('reviewClipTitle');
+  const reviewScoreBadge = document.getElementById('reviewScoreBadge');
+  const reviewDurationBadge = document.getElementById('reviewDurationBadge');
+  const reviewMoodBadge = document.getElementById('reviewMoodBadge');
+  const reviewTitleInput = document.getElementById('reviewTitleInput');
+  const reviewWhyText = document.getElementById('reviewWhyText');
+  const reviewDescInput = document.getElementById('reviewDescInput');
+  const reviewMusicSelect = document.getElementById('reviewMusicSelect');
+  const reviewColorSelect = document.getElementById('reviewColorSelect');
+  const reviewStartInput = document.getElementById('reviewStartInput');
+  const reviewEndInput = document.getElementById('reviewEndInput');
+  const reRenderBtn = document.getElementById('reRenderBtn');
+  const approveBtn = document.getElementById('approveBtn');
+  const rejectBtn = document.getElementById('rejectBtn');
+  const downloadMp4Btn = document.getElementById('downloadMp4Btn');
+  const downloadSrtBtn = document.getElementById('downloadSrtBtn');
 
-function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  startTime = Date.now();
-  if (elapsedTimer) elapsedTimer.textContent = '⏱ 0s';
-  timerInterval = setInterval(() => {
-    if (!startTime) return;
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    if (elapsedTimer) elapsedTimer.textContent = `⏱ ${elapsed}s`;
-  }, 1000);
-}
+  // Auth, History, Logs, Storage
+  const authBtn = document.getElementById('authBtn');
+  const authBtnText = document.getElementById('authBtnText');
+  const loginModal = document.getElementById('loginModal');
+  const loginForm = document.getElementById('loginForm');
+  const closeLoginModalBtn = document.getElementById('closeLoginModalBtn');
+  const loginError = document.getElementById('loginError');
 
-function stopTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = null;
-}
+  const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+  const historyModal = document.getElementById('historyModal');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+  const historyList = document.getElementById('historyList');
 
-const resultsSection = document.getElementById('resultsSection');
-const clipsGrid = document.getElementById('clipsGrid');
-const filterPills = document.querySelectorAll('.filter-pills .pill');
+  const viewLogsBtn = document.getElementById('viewLogsBtn');
+  const logsModal = document.getElementById('logsModal');
+  const closeLogsModalBtn = document.getElementById('closeLogsModalBtn');
+  const logsTableBody = document.getElementById('logsTableBody');
 
-const viewHistoryBtn = document.getElementById('viewHistoryBtn');
-const historyModal = document.getElementById('historyModal');
-const closeModalBtn = document.getElementById('closeModalBtn');
-const historyList = document.getElementById('historyList');
+  const viewStorageBtn = document.getElementById('viewStorageBtn');
+  const storageModal = document.getElementById('storageModal');
+  const closeStorageModalBtn = document.getElementById('closeStorageModalBtn');
+  const storageMetrics = document.getElementById('storageMetrics');
+  const triggerCleanupBtn = document.getElementById('triggerCleanupBtn');
 
-// Form Submission
-generateForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const url = youtubeUrlInput.value.trim();
-  if (!url) return;
+  let currentVideoId = null;
+  let currentActiveClip = null;
+  let activeTaskId = null;
+  let pollInterval = null;
+  let timerInterval = null;
+  let startTime = null;
+  let availableMusicTracks = [];
 
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<span>Processing...</span>';
-  
-  progressSection.classList.remove('hidden');
-  resultsSection.classList.add('hidden');
-  logsConsole.innerHTML = '';
-  updateProgress(5, 'Submitting job...');
-  startTimer();
-
-  try {
-    const res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: url,
-        max_clips: parseInt(maxClipsSelect.value),
-        mode: renderModeSelect.value,
-        use_llm: useLlmCheckbox.checked,
-        force: false
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Failed to submit generation task');
-    }
-
-    const data = await res.json();
-    currentTaskId = data.task_id;
-    startPolling(currentTaskId, data.video_id);
-  } catch (err) {
-    alert(`Error: ${err.message}`);
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
-    progressSection.classList.add('hidden');
-  }
-});
-
-function updateProgress(percent, text) {
-  progressBar.style.width = `${percent}%`;
-  progressPercentage.textContent = `${percent}%`;
-  if (text) currentStepText.textContent = text;
-}
-
-let consecutivePollErrors = 0;
-
-function startPolling(taskId, videoId) {
-  if (pollInterval) clearInterval(pollInterval);
-  consecutivePollErrors = 0;
-
-  pollInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/task/${taskId}`);
-      if (!res.ok) {
-        consecutivePollErrors++;
-        if (consecutivePollErrors > 6) {
-          clearInterval(pollInterval);
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
-          alert('Pipeline task was interrupted. Please try again.');
-        }
-        return;
-      }
-      consecutivePollErrors = 0;
-
-      const task = await res.json();
-      updateProgress(task.progress, task.current_step);
-
-      // Update logs
-      if (task.logs && task.logs.length > 0) {
-        logsConsole.innerHTML = task.logs.map(line => `<div>${escapeHtml(line)}</div>`).join('');
-        logsConsole.scrollTop = logsConsole.scrollHeight;
-      }
-
-      if (task.status === 'completed') {
-        clearInterval(pollInterval);
-        stopTimer();
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
-        progressSection.classList.add('hidden');
-        loadClipsForVideo(videoId);
-      } else if (task.status === 'failed') {
-        clearInterval(pollInterval);
-        stopTimer();
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
-        alert(`Pipeline error: ${task.error}`);
-      }
-    } catch (e) {
-      console.error('Polling error', e);
-    }
-  }, 1200);
-}
-
-async function loadClipsForVideo(videoId) {
-  try {
-    const res = await fetch(`/api/clips/${videoId}`);
-    if (!res.ok) throw new Error('Could not fetch clips');
-    const data = await res.json();
-    allClips = data.clips || [];
-    renderClipsGrid();
-    resultsSection.classList.remove('hidden');
-    resultsSection.scrollIntoView({ behavior: 'smooth' });
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-function renderClipsGrid() {
-  clipsGrid.innerHTML = '';
-  const filtered = allClips.filter(c => {
-    if (currentFilter === 'all') return true;
-    return c.status === currentFilter;
-  });
-
-  if (filtered.length === 0) {
-    clipsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 40px;">No clips found in this filter category.</div>';
-    return;
-  }
-
-  filtered.forEach(clip => {
-    const card = document.createElement('div');
-    card.className = 'clip-card';
-    card.id = `card-${clip.clip_id}`;
-
-    const hookScore = clip.hook_score || 0;
-    const scoreEmoji = hookScore >= 8.5 ? '🔥' : hookScore >= 7.0 ? '⚡' : '✨';
-
-    card.innerHTML = `
-      <div class="video-container">
-        <video src="${clip.video_url}" controls playsinline preload="metadata"></video>
-        <div class="hook-badge">${scoreEmoji} ${hookScore.toFixed(1)}/10 Hook</div>
-        <div class="status-badge status-${clip.status}">${clip.status}</div>
-      </div>
-      <div class="clip-content">
-        <div class="clip-meta-top">
-          <span>⏱ ${clip.duration}s (${clip.start_formatted} - ${clip.end_formatted})</span>
-        </div>
-        <h4 class="clip-title">${escapeHtml(clip.title)}</h4>
-        <div class="hashtags-container">
-          ${(clip.hashtags || []).map(tag => `<span class="hashtag-pill" onclick="copyText('${tag}')">${tag}</span>`).join('')}
-        </div>
-        <div class="card-actions">
-          <button class="btn btn-approve" onclick="updateStatus('${clip.clip_id}', 'approved')">✓ Approve</button>
-          <button class="btn btn-reject" onclick="updateStatus('${clip.clip_id}', 'rejected')">✗ Reject</button>
-          <a href="${clip.download_url}" class="btn-download" download title="Download MP4">💾</a>
-        </div>
-      </div>
-    `;
-    clipsGrid.appendChild(card);
-  });
-}
-
-// Inline Clip Approval & Rejection
-async function updateStatus(clipId, newStatus) {
-  try {
-    const res = await fetch(`/api/clips/${clipId}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
-    });
-    if (!res.ok) throw new Error('Status update failed');
-
-    // Update local cache
-    const match = allClips.find(c => c.clip_id === clipId);
-    if (match) match.status = newStatus;
-
-    renderClipsGrid();
-  } catch (err) {
-    alert(`Could not update clip status: ${err.message}`);
-  }
-}
-
-// Filter Tabs
-filterPills.forEach(pill => {
-  pill.addEventListener('click', () => {
-    filterPills.forEach(p => p.classList.remove('active'));
-    pill.classList.add('active');
-    currentFilter = pill.dataset.filter;
-    renderClipsGrid();
-  });
-});
-
-// History Library Modal
-viewHistoryBtn.addEventListener('click', async () => {
-  try {
-    const res = await fetch('/api/history');
-    if (!res.ok) throw new Error('Could not load history');
-    const history = await res.json();
-
-    if (history.length === 0) {
-      historyList.innerHTML = '<p style="color: #94a3b8;">No past projects found yet.</p>';
-    } else {
-      historyList.innerHTML = history.map(item => `
-        <div class="history-item" style="display:flex; justify-content:space-between; align-items:center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;" onclick="openProject('${item.video_id}')">
-          <div>
-            <strong style="color: #fff; font-size: 14px;">${escapeHtml(item.title)}</strong>
-            <p style="color: #94a3b8; font-size: 12px;">${item.channel} • ${item.clip_count} clips</p>
-          </div>
-          <button class="btn btn-secondary" style="font-size: 11px;">Open</button>
-        </div>
-      `).join('');
-    }
-
-    historyModal.classList.remove('hidden');
-  } catch (err) {
-    alert(err.message);
-  }
-});
-
-function openProject(videoId) {
-  historyModal.classList.add('hidden');
-  loadClipsForVideo(videoId);
-}
-
-closeModalBtn.addEventListener('click', () => {
-  historyModal.classList.add('hidden');
-});
-
-// Tab Switching (YouTube vs Upload)
-const tabYoutube = document.getElementById('tabYoutube');
-const tabUpload = document.getElementById('tabUpload');
-const youtubeInputGroup = document.getElementById('youtubeInputGroup');
-const uploadInputGroup = document.getElementById('uploadInputGroup');
-const videoFileInput = document.getElementById('videoFile');
-const uploadSubmitBtn = document.getElementById('uploadSubmitBtn');
-
-if (tabYoutube && tabUpload) {
-  tabYoutube.addEventListener('click', () => {
-    tabYoutube.classList.add('active');
-    tabUpload.classList.remove('active');
-    youtubeInputGroup.classList.remove('hidden');
-    uploadInputGroup.classList.add('hidden');
-  });
-
+  // Tab Switching
   tabUpload.addEventListener('click', () => {
     tabUpload.classList.add('active');
     tabYoutube.classList.remove('active');
     uploadInputGroup.classList.remove('hidden');
     youtubeInputGroup.classList.add('hidden');
+    ownershipBanner.classList.add('hidden');
+    youtubeUrl.removeAttribute('required');
   });
-}
 
-// File Upload Handler
-if (uploadSubmitBtn) {
+  tabYoutube.addEventListener('click', () => {
+    tabYoutube.classList.add('active');
+    tabUpload.classList.remove('active');
+    youtubeInputGroup.classList.remove('hidden');
+    uploadInputGroup.classList.add('hidden');
+    ownershipBanner.classList.remove('hidden');
+    youtubeUrl.setAttribute('required', 'true');
+  });
+
+  // Stopwatch Timer
+  function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    startTime = Date.now();
+    elapsedTimer.textContent = '⏱ 0s';
+    timerInterval = setInterval(() => {
+      if (!startTime) return;
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      elapsedTimer.textContent = `⏱ ${elapsed}s`;
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  function updateProgress(percent, step) {
+    progressBar.style.width = `${percent}%`;
+    progressPercentage.textContent = `${percent}%`;
+    currentStepText.textContent = step;
+  }
+
+  // Load Music Library
+  async function loadMusicCatalog() {
+    try {
+      const res = await fetch('/api/music/tracks');
+      if (res.ok) {
+        availableMusicTracks = await res.json();
+        reviewMusicSelect.innerHTML = '<option value="none">No Music</option>';
+        availableMusicTracks.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = `${t.name} (${t.mood.toUpperCase()})`;
+          reviewMusicSelect.appendChild(opt);
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load music catalog:', e);
+    }
+  }
+  loadMusicCatalog();
+
+  // Auth Status Check
+  async function checkAuthStatus() {
+    try {
+      const res = await fetch('/api/auth/status');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.auth_required) {
+          authBtnText.textContent = data.logged_in ? '🔓 Logout' : '🔒 Login';
+        } else {
+          authBtn.classList.add('hidden');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  checkAuthStatus();
+
+  authBtn.addEventListener('click', async () => {
+    if (authBtnText.textContent.includes('Logout')) {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      checkAuthStatus();
+    } else {
+      loginModal.classList.remove('hidden');
+    }
+  });
+
+  closeLoginModalBtn.addEventListener('click', () => loginModal.classList.add('hidden'));
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.classList.add('hidden');
+    const pwd = document.getElementById('adminPassword').value;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd })
+      });
+      if (res.ok) {
+        loginModal.classList.add('hidden');
+        checkAuthStatus();
+      } else {
+        const err = await res.json();
+        loginError.textContent = err.detail || 'Login failed';
+        loginError.classList.remove('hidden');
+      }
+    } catch (err) {
+      loginError.textContent = 'Server connection error';
+      loginError.classList.remove('hidden');
+    }
+  });
+
+  // YouTube Submission
+  generateForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!ownershipCheckbox.checked) {
+      alert("Copyright confirmation required: You must check 'I own the rights to this video' before generating clips.");
+      ownershipCheckbox.focus();
+      return;
+    }
+
+    const url = youtubeUrl.value.trim();
+    if (!url) return;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>Processing...</span>';
+    progressSection.classList.remove('hidden');
+    resultsSection.classList.add('hidden');
+    logsConsole.innerHTML = '';
+    updateProgress(5, 'Submitting job...');
+    startTimer();
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: url,
+          max_clips: parseInt(maxClips.value),
+          mode: renderMode.value,
+          use_llm: useLlm.checked,
+          ownership_confirmed: true,
+          caption_color: captionColorSelect.value,
+          force: true,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to submit generation job');
+      }
+
+      const data = await res.json();
+      activeTaskId = data.task_id;
+      currentVideoId = data.video_id;
+      startPolling(data.task_id, data.video_id);
+    } catch (err) {
+      stopTimer();
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
+      alert(`Submission error: ${err.message}`);
+    }
+  });
+
+  // Upload Submission
   uploadSubmitBtn.addEventListener('click', async () => {
-    const file = videoFileInput.files[0];
+    const file = videoFile.files[0];
     if (!file) {
-      alert('Please select a video file (MP4, MOV, WEBM) first.');
+      alert('Please select a video file (MP4/MOV) first.');
       return;
     }
 
@@ -318,14 +269,15 @@ if (uploadSubmitBtn) {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('max_clips', maxClipsSelect.value);
-    formData.append('mode', renderModeSelect.value);
-    formData.append('use_llm', useLlmCheckbox.checked);
+    formData.append('max_clips', maxClips.value);
+    formData.append('mode', renderMode.value);
+    formData.append('use_llm', useLlm.checked ? 'true' : 'false');
+    formData.append('caption_color', captionColorSelect.value);
 
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       if (!res.ok) {
@@ -334,72 +286,377 @@ if (uploadSubmitBtn) {
       }
 
       const data = await res.json();
-      currentTaskId = data.task_id;
-      startPolling(currentTaskId, data.video_id);
+      activeTaskId = data.task_id;
+      currentVideoId = data.video_id;
+      startPolling(data.task_id, data.video_id);
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      stopTimer();
       uploadSubmitBtn.disabled = false;
       uploadSubmitBtn.innerHTML = '<span>Upload & Generate</span><span class="btn-arrow">→</span>';
-      progressSection.classList.add('hidden');
+      alert(`Upload error: ${err.message}`);
     }
   });
-}
 
-// Cookies Modal Handlers
-const openCookiesBtn = document.getElementById('openCookiesBtn');
-const cookiesModal = document.getElementById('cookiesModal');
-const closeCookiesBtn = document.getElementById('closeCookiesBtn');
-const saveCookiesBtn = document.getElementById('saveCookiesBtn');
-const cookiesInput = document.getElementById('cookiesInput');
-const cookiesStatus = document.getElementById('cookiesStatus');
-
-if (openCookiesBtn && cookiesModal) {
-  openCookiesBtn.addEventListener('click', () => {
-    cookiesModal.classList.remove('hidden');
-    cookiesStatus.textContent = '';
+  // Cancel Job
+  cancelJobBtn.addEventListener('click', async () => {
+    if (!activeTaskId) return;
+    if (confirm('Are you sure you want to cancel this processing job?')) {
+      await fetch(`/api/task/${activeTaskId}/cancel`, { method: 'POST' });
+      currentStepText.textContent = 'Cancelling job...';
+    }
   });
 
-  closeCookiesBtn.addEventListener('click', () => {
-    cookiesModal.classList.add('hidden');
-  });
+  // Polling Engine
+  function startPolling(taskId, videoId) {
+    if (pollInterval) clearInterval(pollInterval);
 
-  saveCookiesBtn.addEventListener('click', async () => {
-    const content = cookiesInput.value.trim();
-    if (!content) {
-      alert('Please paste cookie content.');
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/task/${taskId}`);
+        if (!res.ok) return;
+
+        const task = await res.json();
+        updateProgress(task.progress, task.current_step);
+
+        if (task.logs && task.logs.length > 0) {
+          logsConsole.innerHTML = task.logs.map(line => `<div>${escapeHtml(line)}</div>`).join('');
+          logsConsole.scrollTop = logsConsole.scrollHeight;
+        }
+
+        if (task.status === 'completed') {
+          clearInterval(pollInterval);
+          stopTimer();
+          resetSubmitBtns();
+          progressSection.classList.add('hidden');
+          loadClipsForVideo(videoId);
+        } else if (task.status === 'failed' || task.status === 'cancelled') {
+          clearInterval(pollInterval);
+          stopTimer();
+          resetSubmitBtns();
+          alert(`Pipeline ended: ${task.error || task.status}`);
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 1500);
+  }
+
+  function resetSubmitBtns() {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
+    uploadSubmitBtn.disabled = false;
+    uploadSubmitBtn.innerHTML = '<span>Upload & Generate</span><span class="btn-arrow">→</span>';
+  }
+
+  // Load and Render Clips Grid
+  async function loadClipsForVideo(videoId) {
+    currentVideoId = videoId;
+    try {
+      const res = await fetch(`/api/clips/${videoId}`);
+      if (!res.ok) throw new Error('Failed to load clips');
+
+      const data = await res.json();
+      renderClipsGrid(data.clips || []);
+      resultsSection.classList.remove('hidden');
+      resultsSection.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      alert(`Error loading clips: ${err.message}`);
+    }
+  }
+
+  function renderClipsGrid(clips) {
+    clipsGrid.innerHTML = '';
+
+    if (clips.length === 0) {
+      clipsGrid.innerHTML = '<div class="empty-state">No clips found for this video.</div>';
       return;
     }
-    saveCookiesBtn.disabled = true;
-    saveCookiesBtn.textContent = 'Saving...';
+
+    clips.forEach(clip => {
+      const card = document.createElement('div');
+      card.className = 'clip-card';
+      card.dataset.status = clip.status || 'pending';
+
+      const musicTag = clip.music_used ? `🎵 ${clip.music_track || 'Music'}` : 'No Music';
+      const score = clip.hook_score !== undefined ? clip.hook_score : 8.5;
+
+      card.innerHTML = `
+        <div class="video-container">
+          <video src="${clip.video_url}" preload="metadata" muted playsinline></video>
+          <div class="card-overlay">
+            <span class="hook-score-badge">★ ${score}</span>
+            <span class="duration-badge">${Math.round(clip.duration)}s</span>
+          </div>
+          <div class="play-hint-icon">▶</div>
+        </div>
+        <div class="card-content">
+          <div class="card-meta">
+            <span class="status-badge ${clip.status}">${(clip.status || 'pending').toUpperCase()}</span>
+            <span class="music-pill">${musicTag}</span>
+          </div>
+          <h4 class="clip-title">${escapeHtml(clip.title)}</h4>
+          <p class="clip-why">${escapeHtml(clip.why_this_clip || 'High engagement hook')}</p>
+        </div>
+      `;
+
+      card.addEventListener('click', () => openReviewModal(clip));
+      clipsGrid.appendChild(card);
+    });
+  }
+
+  // Interactive Clip Review Modal
+  function openReviewModal(clip) {
+    currentActiveClip = clip;
+    reviewClipTitle.textContent = clip.title;
+    reviewVideoPlayer.src = clip.video_url;
+    reviewScoreBadge.textContent = `Hook Score: ${clip.hook_score}/10`;
+    reviewDurationBadge.textContent = `${Math.round(clip.duration)}s (${clip.start_formatted} - ${clip.end_formatted})`;
+    reviewMoodBadge.textContent = clip.music_used ? `🎵 ${clip.music_track}` : 'No Music';
+    reviewTitleInput.value = clip.title;
+    reviewWhyText.textContent = clip.why_this_clip || 'Standalone complete thought with clean boundary.';
+    reviewDescInput.value = clip.description || '';
+    reviewStartInput.value = clip.start;
+    reviewEndInput.value = clip.end;
+
+    downloadMp4Btn.href = clip.download_url;
+    downloadMp4Btn.setAttribute('download', `${clip.clip_id}.mp4`);
+    downloadSrtBtn.href = clip.srt_url;
+    downloadSrtBtn.setAttribute('download', `${clip.clip_id}.srt`);
+
+    reviewModal.classList.remove('hidden');
+    reviewVideoPlayer.play().catch(() => {});
+  }
+
+  closeReviewModalBtn.addEventListener('click', () => {
+    reviewVideoPlayer.pause();
+    reviewModal.classList.add('hidden');
+  });
+
+  // Approve / Reject
+  approveBtn.addEventListener('click', async () => {
+    if (!currentActiveClip) return;
+    await updateClipStatus(currentActiveClip.clip_id, 'approved');
+    reviewModal.classList.add('hidden');
+  });
+
+  rejectBtn.addEventListener('click', async () => {
+    if (!currentActiveClip) return;
+    await updateClipStatus(currentActiveClip.clip_id, 'rejected');
+    reviewModal.classList.add('hidden');
+  });
+
+  async function updateClipStatus(clipId, newStatus) {
     try {
-      const res = await fetch('/api/cookies', {
+      const res = await fetch(`/api/clips/${clipId}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cookies: content })
+        body: JSON.stringify({ status: newStatus })
       });
+      if (res.ok) {
+        if (currentVideoId) loadClipsForVideo(currentVideoId);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Re-Render / Re-Trim Clip
+  reRenderBtn.addEventListener('click', async () => {
+    if (!currentActiveClip || !currentVideoId) return;
+
+    const newStart = parseFloat(reviewStartInput.value);
+    const newEnd = parseFloat(reviewEndInput.value);
+    if (isNaN(newStart) || isNaN(newEnd) || newEnd <= newStart) {
+      alert('Invalid start or end timestamps.');
+      return;
+    }
+
+    reRenderBtn.disabled = true;
+    reRenderBtn.textContent = 'Rendering...';
+
+    try {
+      const res = await fetch(`/api/clips/${currentVideoId}/${currentActiveClip.clip_id}/re-render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start: newStart,
+          end: newEnd,
+          music_track_id: reviewMusicSelect.value,
+          caption_color: reviewColorSelect.value,
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Re-rendering failed');
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to save');
-      cookiesStatus.style.color = '#10b981';
-      cookiesStatus.textContent = '✓ Saved! Server now authenticated.';
-      setTimeout(() => {
-        cookiesModal.classList.add('hidden');
-      }, 1500);
+      alert('Clip re-rendered successfully with new settings!');
+      reviewVideoPlayer.src = `${currentActiveClip.video_url}?t=${Date.now()}`;
+      reviewVideoPlayer.play();
+      loadClipsForVideo(currentVideoId);
     } catch (err) {
-      cookiesStatus.style.color = '#ef4444';
-      cookiesStatus.textContent = `Error: ${err.message}`;
+      alert(`Error re-rendering: ${err.message}`);
     } finally {
-      saveCookiesBtn.disabled = false;
-      saveCookiesBtn.textContent = 'Save Cookies & Enable';
+      reRenderBtn.disabled = false;
+      reRenderBtn.textContent = '🔄 Re-render Clip';
     }
   });
-}
 
-function copyText(text) {
-  navigator.clipboard.writeText(text);
-  alert(`Copied ${text} to clipboard!`);
-}
+  // Download Approved ZIP
+  downloadApprovedZipBtn.addEventListener('click', () => {
+    if (!currentVideoId) {
+      alert('No video loaded.');
+      return;
+    }
+    window.location.href = `/api/clips/${currentVideoId}/export-zip`;
+  });
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+  // History / Past Projects
+  viewHistoryBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/history');
+      if (res.ok) {
+        const list = await res.json();
+        renderHistoryList(list);
+        historyModal.classList.remove('hidden');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  closeModalBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
+
+  function renderHistoryList(items) {
+    historyList.innerHTML = '';
+    if (items.length === 0) {
+      historyList.innerHTML = '<div class="empty-state">No processed projects yet.</div>';
+      return;
+    }
+
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      row.innerHTML = `
+        <div class="history-item-info">
+          <h4>${escapeHtml(item.title)}</h4>
+          <p>${item.channel ? item.channel + ' • ' : ''}${item.clip_count} clips generated</p>
+        </div>
+        <div class="history-item-actions">
+          <button class="btn btn-secondary btn-sm load-proj-btn">Open</button>
+          <button class="btn btn-danger btn-sm del-proj-btn">Delete</button>
+        </div>
+      `;
+
+      row.querySelector('.load-proj-btn').addEventListener('click', () => {
+        historyModal.classList.add('hidden');
+        loadClipsForVideo(item.video_id);
+      });
+
+      row.querySelector('.del-proj-btn').addEventListener('click', async () => {
+        const confirmation = prompt(`To permanently delete '${item.title}', type DELETE below:`);
+        if (confirmation === 'DELETE') {
+          const delRes = await fetch(`/api/video/${item.video_id}/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirmation: 'DELETE' })
+          });
+          if (delRes.ok) {
+            row.remove();
+          } else {
+            alert('Delete rejected.');
+          }
+        }
+      });
+
+      historyList.appendChild(row);
+    });
+  }
+
+  // Run History Log
+  viewLogsBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/log');
+      if (res.ok) {
+        const logs = await res.json();
+        logsTableBody.innerHTML = '';
+        logs.forEach(l => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${l.timestamp ? l.timestamp.split('.')[0] : ''}</td>
+            <td><code>${l.video_id || ''}</code></td>
+            <td>${l.source_type || 'youtube'}</td>
+            <td>${l.clips_generated || 0}</td>
+            <td><strong>${l.status || ''}</strong></td>
+            <td>${escapeHtml(l.details || '')}</td>
+          `;
+          logsTableBody.appendChild(tr);
+        });
+        logsModal.classList.remove('hidden');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  closeLogsModalBtn.addEventListener('click', () => logsModal.classList.add('hidden'));
+
+  // Storage Information
+  viewStorageBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/storage');
+      if (res.ok) {
+        const stats = await res.json();
+        storageMetrics.innerHTML = `
+          <p><strong>Rendered Output Storage:</strong> ${stats.output_mb} MB</p>
+          <p><strong>Original Downloads Storage:</strong> ${stats.originals_mb} MB</p>
+          <p><strong>Disk Free:</strong> ${stats.disk_free_gb} GB / ${stats.disk_total_gb} GB (${stats.disk_used_percent}% used)</p>
+          <p class="text-muted"><small>Originals auto-expire after 7 days to conserve disk space.</small></p>
+        `;
+        storageModal.classList.remove('hidden');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  closeStorageModalBtn.addEventListener('click', () => storageModal.classList.add('hidden'));
+
+  triggerCleanupBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/storage/cleanup', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      alert(`Auto-cleanup completed: ${data.cleaned_items} expired items removed.`);
+      storageModal.classList.add('hidden');
+    }
+  });
+
+  // Filter Pills (All / Pending / Approved / Rejected)
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const filter = pill.dataset.filter;
+      const cards = document.querySelectorAll('.clip-card');
+      cards.forEach(card => {
+        if (filter === 'all' || card.dataset.status === filter) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    });
+  });
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+});

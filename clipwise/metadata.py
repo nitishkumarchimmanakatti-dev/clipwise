@@ -102,6 +102,12 @@ def create_clip_metadata(
         "start_formatted": start_str,
         "end_formatted": end_str,
         "hook_score": hook_score,
+        "why_this_clip": candidate.get("why_this_clip", "Strong standalone hook and narrative flow"),
+        "music_used": bool(candidate.get("music_track")),
+        "music_track": candidate.get("music_track", {}).get("name") if candidate.get("music_track") else None,
+        "music_license": candidate.get("music_track", {}).get("license") if candidate.get("music_track") else None,
+        "music_reason": candidate.get("music_reason", "Informational speech - no background music needed"),
+        "version": candidate.get("version", 1),
         "source": {
             "title": source_title,
             "channel": channel_name,

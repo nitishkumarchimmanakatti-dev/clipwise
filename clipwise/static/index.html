@@ -4,45 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <!-- Primary Meta Tags -->
-  <title>Clipwise - AI YouTube Shorts Generator | Long Video to Viral Clips</title>
-  <meta name="title" content="Clipwise - AI YouTube Shorts Generator | Long Video to Viral Clips">
-  <meta name="description" content="Clipwise is the official AI agent that turns long YouTube videos into viral 9:16 Shorts. Transcribe speech, isolate high-retention hooks, and burn captions automatically.">
-  <meta name="keywords" content="Clipwise, YouTube Shorts generator, AI video clips, Opus Clip alternative, viral shorts, video repurposing, automatic video editor">
+  <title>Clipwise v2 - Viral YouTube Shorts AI Studio</title>
+  <meta name="title" content="Clipwise v2 - Viral YouTube Shorts AI Studio">
+  <meta name="description" content="Turn long videos into viral 9:16 Shorts with hook-first clip selection, bottom blur captions, and situational background music.">
   <meta name="robots" content="index, follow">
-  <meta name="author" content="Clipwise Official">
-  <link rel="canonical" href="https://clipwise-app.up.railway.app/">
-
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://clipwise-app.up.railway.app/">
-  <meta property="og:title" content="Clipwise - Turn Long YouTube Videos into Viral Shorts">
-  <meta property="og:description" content="Official Clipwise web application: auto-transcribe, find viral hooks, crop to 9:16 vertical video, and burn subtitles.">
-  <meta property="og:site_name" content="Clipwise">
-
-  <!-- Twitter Card -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://clipwise-app.up.railway.app/">
-  <meta property="twitter:title" content="Clipwise - Official AI YouTube Shorts Maker">
-  <meta property="twitter:description" content="Transform long YouTube videos into viral vertical clips in minutes.">
-
-  <!-- Schema.org JSON-LD for Google Search Rich Results -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Clipwise",
-    "url": "https://clipwise-app.up.railway.app",
-    "applicationCategory": "MultimediaApplication",
-    "operatingSystem": "All",
-    "description": "Intelligent agent that turns long YouTube videos into viral short vertical clips with captions and hook scoring.",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    }
-  }
-  </script>
 
   <link rel="stylesheet" href="/static/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,21 +19,27 @@
   <canvas id="bg3d"></canvas>
 
   <div class="app-layout">
-    <!-- Header -->
+    <!-- Navbar -->
     <header class="navbar">
       <div class="brand">
         <div class="logo-icon">✂️</div>
         <div class="brand-text">
-          <h1>Clipwise</h1>
-          <span class="badge">Official AI Shorts App</span>
+          <h1>Clipwise <span class="v2-badge">v2</span></h1>
+          <span class="badge">Viral Shorts AI Studio</span>
         </div>
       </div>
       <div class="nav-actions">
-        <button id="openCookiesBtn" class="btn btn-secondary">
-          <span>🍪 Cookies</span>
-        </button>
         <button id="viewHistoryBtn" class="btn btn-secondary">
           <span>📁 Library</span>
+        </button>
+        <button id="viewLogsBtn" class="btn btn-secondary">
+          <span>📜 History Log</span>
+        </button>
+        <button id="viewStorageBtn" class="btn btn-secondary">
+          <span>💾 Storage</span>
+        </button>
+        <button id="authBtn" class="btn btn-secondary">
+          <span id="authBtnText">🔒 Login</span>
         </button>
       </div>
     </header>
@@ -79,36 +50,24 @@
       <section class="hero-section">
         <div class="hero-header">
           <h2>Turn 1 Long Video into <span class="gradient-text">10 Viral Shorts</span></h2>
-          <p>The official Clipwise engine finds high-retention hooks, transcribes with Whisper, formats to 9:16 vertical video, and burns dynamic captions.</p>
+          <p>Hook-first selection, subtitles in the bottom blur zone, and situational background music.</p>
         </div>
 
         <div class="generator-card">
           <div class="tabs-header">
-            <button type="button" id="tabYoutube" class="tab-btn active"><span>📺 YouTube URL</span></button>
-            <button type="button" id="tabUpload" class="tab-btn"><span>📤 Upload Video (MP4 / MOV)</span></button>
+            <button type="button" id="tabUpload" class="tab-btn active"><span>📤 Upload Video (Primary)</span></button>
+            <button type="button" id="tabYoutube" class="tab-btn"><span>📺 YouTube URL (Secondary)</span></button>
           </div>
 
           <form id="generateForm" class="generator-form">
-            <div id="youtubeInputGroup" class="input-group">
-              <span class="input-icon">🔗</span>
-              <input 
-                type="url" 
-                id="youtubeUrl" 
-                placeholder="Paste YouTube Video URL (e.g., https://www.youtube.com/watch?v=...)" 
-                required
-              />
-              <button type="submit" id="submitBtn" class="btn btn-primary">
-                <span>Generate Clips</span>
-                <span class="btn-arrow">→</span>
-              </button>
-            </div>
-
-            <div id="uploadInputGroup" class="input-group hidden">
+            <!-- Upload Group (Primary) -->
+            <div id="uploadInputGroup" class="input-group">
               <span class="input-icon">📁</span>
               <input 
                 type="file" 
                 id="videoFile" 
                 accept="video/mp4,video/quicktime,video/webm,video/mkv"
+                required
               />
               <button type="button" id="uploadSubmitBtn" class="btn btn-primary">
                 <span>Upload & Generate</span>
@@ -116,6 +75,29 @@
               </button>
             </div>
 
+            <!-- YouTube Group (Secondary) -->
+            <div id="youtubeInputGroup" class="input-group hidden">
+              <span class="input-icon">🔗</span>
+              <input 
+                type="url" 
+                id="youtubeUrl" 
+                placeholder="Paste Single YouTube Video URL (e.g. https://youtu.be/...)" 
+              />
+              <button type="submit" id="submitBtn" class="btn btn-primary">
+                <span>Generate Clips</span>
+                <span class="btn-arrow">→</span>
+              </button>
+            </div>
+
+            <!-- Mandatory Ownership Confirmation for YouTube URLs -->
+            <div id="ownershipBanner" class="ownership-banner hidden">
+              <label class="ownership-label">
+                <input type="checkbox" id="ownershipCheckbox">
+                <span><strong>I own the rights to this video.</strong> (Required by YouTube Terms of Service & Copyright Laws. Single video only.)</span>
+              </label>
+            </div>
+
+            <!-- Config Options -->
             <div class="options-bar">
               <div class="option-item">
                 <label for="maxClips">Max Clips:</label>
@@ -134,16 +116,25 @@
                 </select>
               </div>
 
+              <div class="option-item">
+                <label for="captionColorSelect">Caption Color:</label>
+                <select id="captionColorSelect">
+                  <option value="#FFD700" selected>Warm Gold (#FFD700)</option>
+                  <option value="#1BF7FF">Electric Yellow (#1BF7FF)</option>
+                  <option value="#FFFFFF">Crisp White (#FFFFFF)</option>
+                </select>
+              </div>
+
               <div class="option-item checkbox-item">
                 <input type="checkbox" id="useLlm">
-                <label for="useLlm">AI Hook Enrichment (LLM)</label>
+                <label for="useLlm">LLM Enrichment</label>
               </div>
             </div>
           </form>
         </div>
       </section>
 
-      <!-- Live Processing Visualizer -->
+      <!-- Live Processing Visualizer with Cancel Button -->
       <section id="progressSection" class="progress-section hidden">
         <div class="progress-card">
           <div class="progress-header">
@@ -153,6 +144,7 @@
               <div class="progress-meta">
                 <span id="elapsedTimer" class="elapsed-badge">⏱ 0s</span>
                 <p id="progressPercentage">0%</p>
+                <button type="button" id="cancelJobBtn" class="btn btn-danger btn-sm">Cancel Job</button>
               </div>
             </div>
           </div>
@@ -171,13 +163,18 @@
         <div class="results-header">
           <div>
             <h3>Generated Shorts Candidates</h3>
-            <p id="resultsSubtitle">Review, approve, or download your ready-to-publish clips.</p>
+            <p id="resultsSubtitle">Click any clip to review, approve, re-trim, or export.</p>
           </div>
-          <div class="filter-pills">
-            <button class="pill active" data-filter="all">All</button>
-            <button class="pill" data-filter="pending">Pending</button>
-            <button class="pill" data-filter="approved">Approved</button>
-            <button class="pill" data-filter="rejected">Rejected</button>
+          <div class="results-actions">
+            <button id="downloadApprovedZipBtn" class="btn btn-primary btn-sm">
+              <span>⬇️ Download Approved (.ZIP)</span>
+            </button>
+            <div class="filter-pills">
+              <button class="pill active" data-filter="all">All</button>
+              <button class="pill" data-filter="pending">Pending</button>
+              <button class="pill" data-filter="approved">Approved</button>
+              <button class="pill" data-filter="rejected">Rejected</button>
+            </div>
           </div>
         </div>
 
@@ -187,42 +184,156 @@
       </section>
     </main>
 
-    <!-- Cookies Modal -->
-    <div id="cookiesModal" class="modal hidden">
-      <div class="modal-content cookies-modal-content">
+    <!-- Clip Review & Edit Modal -->
+    <div id="reviewModal" class="modal hidden">
+      <div class="modal-content review-modal-content">
         <div class="modal-header">
-          <h3>🍪 YouTube Bot Bypass / Cookies</h3>
-          <button id="closeCookiesBtn" class="close-btn">&times;</button>
+          <h3 id="reviewClipTitle">Review Clip</h3>
+          <button id="closeReviewModalBtn" class="close-btn">&times;</button>
         </div>
-        <div class="cookies-body">
-          <p class="cookies-desc">
-            Cloud servers (Railway, AWS) are frequently challenged by YouTube bot filters. 
-            Paste your YouTube session cookies (from the free <strong>Get cookies.txt LOCALLY</strong> extension) below to authenticate all server downloads.
-          </p>
-          <textarea id="cookiesInput" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com TRUE / FALSE 1750000000 SID ..."></textarea>
-          <div class="cookies-actions">
-            <button id="saveCookiesBtn" class="btn btn-primary">Save Cookies & Enable</button>
-            <span id="cookiesStatus" class="cookies-status-msg"></span>
+        <div class="review-modal-body">
+          <!-- Left: Vertical Video Player -->
+          <div class="review-player-pane">
+            <video id="reviewVideoPlayer" controls playsinline preload="auto"></video>
+            <div class="review-meta-pills">
+              <span id="reviewScoreBadge" class="score-pill">Score: 9.0/10</span>
+              <span id="reviewDurationBadge" class="duration-pill">30s</span>
+              <span id="reviewMoodBadge" class="mood-pill">No Music</span>
+            </div>
+          </div>
+
+          <!-- Right: Metadata & Actions -->
+          <div class="review-details-pane">
+            <div class="review-field">
+              <label>Title:</label>
+              <input type="text" id="reviewTitleInput" />
+            </div>
+
+            <div class="review-field">
+              <label>Why this clip was selected:</label>
+              <p id="reviewWhyText" class="review-why-box"></p>
+            </div>
+
+            <div class="review-field">
+              <label>Description & Hashtags:</label>
+              <textarea id="reviewDescInput" rows="4"></textarea>
+            </div>
+
+            <div class="review-row">
+              <div class="review-field">
+                <label>Background Music:</label>
+                <select id="reviewMusicSelect">
+                  <option value="none">No Music</option>
+                  <!-- Dynamically populated from /api/music/tracks -->
+                </select>
+              </div>
+
+              <div class="review-field">
+                <label>Caption Color:</label>
+                <select id="reviewColorSelect">
+                  <option value="#FFD700">Warm Gold (#FFD700)</option>
+                  <option value="#1BF7FF">Electric Yellow (#1BF7FF)</option>
+                  <option value="#FFFFFF">Crisp White (#FFFFFF)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="review-row">
+              <div class="review-field">
+                <label>Start (seconds):</label>
+                <input type="number" id="reviewStartInput" step="0.1" />
+              </div>
+              <div class="review-field">
+                <label>End (seconds):</label>
+                <input type="number" id="reviewEndInput" step="0.1" />
+              </div>
+              <button id="reRenderBtn" class="btn btn-secondary review-action-btn">
+                <span>🔄 Re-render Clip</span>
+              </button>
+            </div>
+
+            <div class="review-approval-actions">
+              <button id="approveBtn" class="btn btn-success">✓ Approve Clip</button>
+              <button id="rejectBtn" class="btn btn-danger">✗ Reject Clip</button>
+            </div>
+
+            <div class="review-download-actions">
+              <a id="downloadMp4Btn" class="btn btn-secondary" download>Download MP4</a>
+              <a id="downloadSrtBtn" class="btn btn-secondary" download>Download SRT</a>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- History Drawer / Modal -->
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal hidden">
+      <div class="modal-content auth-modal-content">
+        <div class="modal-header">
+          <h3>🔒 Admin Authentication</h3>
+          <button id="closeLoginModalBtn" class="close-btn">&times;</button>
+        </div>
+        <form id="loginForm" class="auth-form">
+          <p class="auth-hint">Clipwise v2 is protected to prevent unauthorized compute usage. Enter master password:</p>
+          <input type="password" id="adminPassword" placeholder="Master Password" required />
+          <button type="submit" class="btn btn-primary">Log In</button>
+          <p id="loginError" class="auth-error hidden"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Storage Info Modal -->
+    <div id="storageModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>💾 Storage & Quota Management</h3>
+          <button id="closeStorageModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="storage-body">
+          <div id="storageMetrics" class="storage-metrics">Loading storage metrics...</div>
+          <button id="triggerCleanupBtn" class="btn btn-secondary">Run 7-Day Auto-Cleanup Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History / Past Projects Modal with Safe Delete -->
     <div id="historyModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
           <h3>Past Video Projects</h3>
           <button id="closeModalBtn" class="close-btn">&times;</button>
         </div>
-        <div id="historyList" class="history-list">
-          <!-- Dynamically populated -->
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </div>
+
+    <!-- Run Log Modal -->
+    <div id="logsModal" class="modal hidden">
+      <div class="modal-content logs-modal-content">
+        <div class="modal-header">
+          <h3>📜 System Run History Log</h3>
+          <button id="closeLogsModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="logs-table-wrapper">
+          <table class="logs-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Video ID</th>
+                <th>Source</th>
+                <th>Clips</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Three.js & 3D Interactive Background -->
+  <!-- Three.js & Background Simulation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="/static/bg3d.js"></script>
   <script src="/static/app.js"></script>

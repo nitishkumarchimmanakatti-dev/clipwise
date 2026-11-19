@@ -118,16 +118,35 @@ def get_all_pending_clips() -> List[Dict[str, str]]:
     return pending
 
 
-def append_to_run_log(video_id: str, url: str, clip_count: int, status: str = "SUCCESS", details: str = ""):
-    """Log pipeline run event to ~/Clipwise/clipwise_log.csv."""
+def append_to_run_log(
+    video_id: str,
+    url: str,
+    clip_count: int,
+    status: str = "SUCCESS",
+    details: str = "",
+    source_type: str = "youtube",
+    ownership_confirmed: bool = True,
+):
+    """Log pipeline run event, uploads, and ownership confirmations to clipwise_log.csv."""
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     file_exists = LOG_FILE.exists()
 
-    headers = ["timestamp", "video_id", "url", "clips_generated", "status", "details"]
+    headers = [
+        "timestamp",
+        "video_id",
+        "source_type",
+        "url_or_file",
+        "ownership_confirmed",
+        "clips_generated",
+        "status",
+        "details",
+    ]
     row = {
         "timestamp": datetime.now().isoformat(),
         "video_id": video_id,
-        "url": url,
+        "source_type": source_type,
+        "url_or_file": url,
+        "ownership_confirmed": "YES" if ownership_confirmed else "NO",
         "clips_generated": str(clip_count),
         "status": status,
         "details": details,
@@ -138,3 +157,35 @@ def append_to_run_log(video_id: str, url: str, clip_count: int, status: str = "S
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
+
+
+def create_approved_clips_zip(video_id: str) -> Optional[Path]:
+    """Package only 'approved' clips (mp4, srt, and metadata.json) into a downloadable ZIP."""
+    import zipfile
+    video_dir = OUTPUT_DIR / video_id
+    if not video_dir.exists():
+        return None
+
+    csv_path = video_dir / "review.csv"
+    if not csv_path.exists():
+        return None
+
+    approved_clip_ids = set()
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("status") == "approved":
+                approved_clip_ids.add(row["clip_id"])
+
+    if not approved_clip_ids:
+        return None
+
+    zip_path = video_dir / f"{video_id}_approved_clips.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for cid in approved_clip_ids:
+            for ext in [".mp4", ".srt", "_metadata.json", ".ass"]:
+                target_file = video_dir / f"{cid}{ext}"
+                if target_file.exists():
+                    zf.write(target_file, arcname=f"{cid}/{target_file.name}")
+
+    return zip_path

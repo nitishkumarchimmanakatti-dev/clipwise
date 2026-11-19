@@ -48,11 +48,19 @@ def extract_video_id(url: str) -> str:
     raise ValueError(f"Could not extract a valid YouTube video ID from URL: {url}")
 
 
-def validate_youtube_url(url: str) -> str:
-    """Validate that the input is a single YouTube video URL (disallowing playlists)."""
+def validate_youtube_url(url: str, ownership_confirmed: bool = False) -> str:
+    """Validate that the input is a single YouTube video URL (disallowing playlists and channels)
+    and that the user has verified ownership.
+    """
     clean_url = url.strip()
     if not clean_url:
         raise ValueError("Provided URL is empty.")
+
+    if not ownership_confirmed:
+        raise ValueError(
+            "Copyright confirmation required: You must check 'I own the rights to this video' "
+            "to process a YouTube URL."
+        )
 
     parsed = urlparse(clean_url)
     if not parsed.scheme or not parsed.netloc:
@@ -62,20 +70,27 @@ def validate_youtube_url(url: str) -> str:
     if not any(domain in hostname for domain in ["youtube.com", "youtu.be"]):
         raise ValueError(f"URL domain is not YouTube: {hostname}")
 
-    # Check for playlist-only URLs
-    if "list=" in parsed.query and "v=" not in parsed.query and not parsed.path.startswith("/watch"):
-        raise ValueError("Playlist URLs are not supported. Please provide a single video URL.")
+    # Reject channels and playlists
+    if any(p in parsed.path.lower() for p in ["/channel/", "/@", "/c/", "/user/", "/playlist"]):
+        raise ValueError("Channel and playlist URLs are strictly disallowed. Please submit a single video.")
+
+    if "list=" in parsed.query:
+        raise ValueError("Playlists are not supported. Please provide a direct, single video URL.")
 
     return extract_video_id(clean_url)
 
 
-def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str, Any]]:
+def download_video(
+    url: str,
+    force: bool = False,
+    ownership_confirmed: bool = True,
+) -> Tuple[Path, Path, Dict[str, Any]]:
     """Download best mp4 under 1080p and extract audio for transcription.
     
     Returns:
         (video_file_path, audio_file_path, metadata_dict)
     """
-    video_id = validate_youtube_url(url)
+    video_id = validate_youtube_url(url, ownership_confirmed=ownership_confirmed)
     dest_dir = DOWNLOADS_DIR / video_id
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -96,6 +111,11 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
         "noplaylist": True,
         "merge_output_format": "mp4",
         "concurrent_fragment_downloads": 5,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "android", "web"],
+            }
+        },
         "js_runtimes": {"node": {}},
         "remote_components": {"ejs:github"},
         "quiet": False,

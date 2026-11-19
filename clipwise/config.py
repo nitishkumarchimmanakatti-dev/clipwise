@@ -6,14 +6,27 @@ import shutil
 import subprocess
 
 # Root directories for output and downloads
-CLIPWISE_ROOT = Path.home() / "Clipwise"
-OUTPUT_DIR = CLIPWISE_ROOT / "output"
-DOWNLOADS_DIR = CLIPWISE_ROOT / "downloads"
-LOG_FILE = CLIPWISE_ROOT / "clipwise_log.csv"
+CLIPWISE_DATA_DIR = Path(os.getenv("CLIPWISE_DATA_DIR", str(Path.home() / "Clipwise")))
+OUTPUT_DIR = CLIPWISE_DATA_DIR / "output"
+ORIGINALS_DIR = CLIPWISE_DATA_DIR / "originals"
+DOWNLOADS_DIR = ORIGINALS_DIR  # Alias for backward-compatibility
+LOG_FILE = CLIPWISE_DATA_DIR / "clipwise_log.csv"
+
+# Storage, Upload & Security Constraints
+MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "500"))
+ORIGINALS_TTL_DAYS = int(os.getenv("ORIGINALS_TTL_DAYS", "7"))
+CLIPWISE_PASSWORD = os.getenv("CLIPWISE_PASSWORD", "")  # Empty means open/dev mode
+SESSION_SECRET = os.getenv("SESSION_SECRET", "clipwise-v2-super-secret-key-39824")
+
+# Caption Styling
+DEFAULT_CAPTION_COLOR = os.getenv("DEFAULT_CAPTION_COLOR", "#FFD700")  # Default warm gold
+CAPTION_ZONE_MIN_Y = 1400
+CAPTION_ZONE_MAX_Y = 1700
+CAPTION_BOTTOM_CLEARANCE = 150
 
 # Ensure essential base folders exist
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+ORIGINALS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Clip constraints
 MIN_CLIP_DURATION = 15.0  # seconds

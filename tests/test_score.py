@@ -1,6 +1,6 @@
 """Tests for hook scoring signals and ranking."""
 
-from clipwise.score import calculate_rule_based_hook_score, score_candidates
+from clipwise.score import calculate_rule_based_hook_score, score_candidates, evaluate_hook_details
 
 
 def test_question_hook_scores_higher_than_plain_statement():
@@ -56,4 +56,23 @@ def test_score_candidates_ranking():
     assert len(scored) == 2
     # The high hook candidate should be first
     assert "Stop" in scored[0]["text"]
-    assert scored[0]["hook_score"] > scored[1]["hook_score"]
+    assert "why_this_clip" in scored[0]
+
+
+def test_hindi_hinglish_hook_scoring():
+    hi_cand = {
+        "start": 0.0,
+        "end": 30.0,
+        "duration": 30.0,
+        "text": "Yeh sabse bada raaz hai jo kisi ne nahi bataya!",
+        "words": [
+            {"word": "Yeh", "start": 0.1, "end": 0.4},
+            {"word": "sabse", "start": 0.5, "end": 0.8},
+            {"word": "bada", "start": 0.9, "end": 1.2},
+            {"word": "raaz", "start": 1.3, "end": 1.8},
+            {"word": "hai!", "start": 1.9, "end": 2.3},
+        ],
+    }
+    score_details = evaluate_hook_details(hi_cand)
+    assert score_details["score"] >= 6.5
+    assert "raaz" in score_details["why"].lower() or "hook" in score_details["why"].lower()

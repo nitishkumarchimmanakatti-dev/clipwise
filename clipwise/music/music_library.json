@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "description": "Licensed royalty-free situational background music library for Clipwise v2",
+  "tracks": [
+    {
+      "id": "emotional_01",
+      "name": "Quiet Solitude",
+      "filename": "quiet_solitude.mp3",
+      "mood": "emotional",
+      "tempo": "slow",
+      "duration_sec": 75.0,
+      "license": "Creative Commons Zero (CC0) / Royalty-Free",
+      "source_url": "https://pixabay.com/music/",
+      "keywords": ["miss", "yaad", "dard", "life", "mother", "struggle", "emotional", "alone", "cry", "sad"]
+    },
+    {
+      "id": "motivational_01",
+      "name": "Rise Above",
+      "filename": "rise_above.mp3",
+      "mood": "motivational",
+      "tempo": "driving",
+      "duration_sec": 75.0,
+      "license": "YouTube Audio Library (Royalty Free)",
+      "source_url": "https://studio.youtube.com/channel/music",
+      "keywords": ["never give up", "jeetenge", "himmat", "fail", "winner", "hard work", "focus", "success", "grind"]
+    },
+    {
+      "id": "romantic_01",
+      "name": "Sunset Melodies",
+      "filename": "sunset_melodies.mp3",
+      "mood": "romantic",
+      "tempo": "moderate",
+      "duration_sec": 75.0,
+      "license": "Pixabay Music License",
+      "source_url": "https://pixabay.com/music/",
+      "keywords": ["love", "pyaar", "dil", "ishq", "relationship", "together", "heart", "beautiful"]
+    },
+    {
+      "id": "comedy_01",
+      "name": "Sneaky Mischief",
+      "filename": "sneaky_mischief.mp3",
+      "mood": "comedy",
+      "tempo": "bouncy",
+      "duration_sec": 75.0,
+      "license": "Pixabay Music License",
+      "source_url": "https://pixabay.com/music/",
+      "keywords": ["joke", "funny", "laugh", "prank", "crazy", "comedy", "lmao", "lol", "hahaha"]
+    }
+  ]
+}

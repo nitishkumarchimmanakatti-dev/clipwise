@@ -1,5 +1,16 @@
 """Clipwise CLI: Turn long YouTube videos into viral vertical short clips."""
 
+# Fix compatibility between faster-whisper and newer PyAV versions (14+)
+try:
+    import av
+    _orig_av_open = av.open
+    def _safe_av_open(*args, **kwargs):
+        kwargs.pop("metadata_errors", None)
+        return _orig_av_open(*args, **kwargs)
+    av.open = _safe_av_open
+except Exception:
+    pass
+
 import argparse
 import sys
 import json
@@ -11,6 +22,7 @@ from clipwise.config import (
     OUTPUT_DIR,
     DEFAULT_MAX_CLIPS,
     DEFAULT_RENDER_MODE,
+    DEFAULT_CAPTION_COLOR,
 )
 from clipwise.download import download_video, validate_youtube_url
 from clipwise.transcribe import transcribe_audio
@@ -24,6 +36,8 @@ from clipwise.review import (
     get_all_pending_clips,
     append_to_run_log,
 )
+from clipwise.music import detect_clip_mood, get_track_for_mood
+from clipwise.storage import get_next_render_version
 
 
 def run_pipeline(
@@ -33,6 +47,8 @@ def run_pipeline(
     mode: str = DEFAULT_RENDER_MODE,
     use_llm: bool = False,
     progress_callback=None,
+    ownership_confirmed: bool = True,
+    caption_color: str = DEFAULT_CAPTION_COLOR,
 ):
     """Run full end-to-end processing pipeline for a single YouTube video."""
     ensure_ffmpeg()
@@ -44,13 +60,17 @@ def run_pipeline(
             print(f"[{percent:3d}%] [{step.upper()}] {message}")
 
     notify("validate", 5, f"Validating YouTube URL: {url}")
-    video_id = validate_youtube_url(url)
+    video_id = validate_youtube_url(url, ownership_confirmed=ownership_confirmed)
     video_output_dir = OUTPUT_DIR / video_id
     video_output_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Download Video & Audio
     notify("download", 15, "Downloading video and extracting audio via yt-dlp...")
-    video_file, audio_file, metadata = download_video(url, force=force)
+    video_file, audio_file, metadata = download_video(
+        url,
+        force=force,
+        ownership_confirmed=ownership_confirmed,
+    )
     notify("download", 30, f"Downloaded '{metadata.get('title', '')}' ({metadata.get('duration', 0)}s)")
 
     # 2. Transcribe Audio
@@ -64,7 +84,10 @@ def run_pipeline(
     candidates = generate_candidate_segments(transcript)
     if not candidates:
         notify("error", 100, "No valid segments between 15 and 60 seconds found.")
-        append_to_run_log(video_id, url, 0, "FAILED", "No valid speech segments found")
+        append_to_run_log(
+            video_id, url, 0, "FAILED", "No valid speech segments found",
+            source_type="youtube", ownership_confirmed=ownership_confirmed,
+        )
         return []
 
     # 4. Hook Scoring & Ranking
@@ -75,9 +98,10 @@ def run_pipeline(
     # 5. Render Clips & Captions
     clips_info = []
     total = len(top_candidates)
+    version_id = get_next_render_version(video_output_dir)
 
     for idx, cand in enumerate(top_candidates, start=1):
-        clip_id = f"{video_id}_clip_{idx:02d}"
+        clip_id = f"{video_id}_v{version_id}_clip_{idx:02d}"
         render_pct_start = 75 + int(((idx - 0.7) / total) * 20)
         render_pct_done = 75 + int((idx / total) * 20)
         notify("render", render_pct_start, f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
@@ -86,12 +110,20 @@ def run_pipeline(
         clip_srt = video_output_dir / f"{clip_id}.srt"
         clip_meta_file = video_output_dir / f"{clip_id}_metadata.json"
 
+        # Detect situational background music
+        mood, music_reason = detect_clip_mood(cand)
+        cand["mood"] = mood
+        cand["music_reason"] = music_reason
+        music_track = get_track_for_mood(mood)
+        cand["music_track"] = music_track
+        cand["version"] = version_id
+
         # Generate metadata
         meta = create_clip_metadata(cand, metadata, clip_id)
         with open(clip_meta_file, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
-        # Render 9:16 vertical video with burned-in subtitles (placed in bottom blur zone)
+        # Render 9:16 vertical video with burned-in subtitles (placed in bottom blur zone) and ducked music
         render_clip(
             source_video=video_file,
             candidate=cand,
@@ -100,8 +132,11 @@ def run_pipeline(
             mode=mode,
             burn_captions=True,
             force=True,
+            caption_color=caption_color,
+            music_track=music_track,
         )
-        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s) ready")
+        music_note = f" with {music_track['name']}" if music_track else " (no music)"
+        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s){music_note}")
 
         clips_info.append({
             "clip_id": clip_id,
@@ -109,6 +144,10 @@ def run_pipeline(
             "end": cand["end"],
             "duration": cand["duration"],
             "hook_score": cand["hook_score"],
+            "why_this_clip": cand.get("why_this_clip", ""),
+            "music_used": bool(music_track),
+            "music_track": music_track.get("name") if music_track else None,
+            "music_reason": music_reason,
             "title": meta["title"],
             "mp4": str(clip_mp4),
             "srt": str(clip_srt),
@@ -117,7 +156,10 @@ def run_pipeline(
 
     # 6. Initialize Review Sheet & Log
     init_review_sheet(video_output_dir, clips_info)
-    append_to_run_log(video_id, url, len(clips_info), "SUCCESS", f"Generated {len(clips_info)} clips")
+    append_to_run_log(
+        video_id, url, len(clips_info), "SUCCESS", f"Generated {len(clips_info)} clips (v{version_id})",
+        source_type="youtube", ownership_confirmed=ownership_confirmed,
+    )
 
     notify("complete", 100, f"Complete! All clips saved to {video_output_dir}")
     return clips_info
@@ -131,6 +173,7 @@ def run_pipeline_for_file(
     mode: str = DEFAULT_RENDER_MODE,
     use_llm: bool = False,
     progress_callback=None,
+    caption_color: str = DEFAULT_CAPTION_COLOR,
 ):
     """Run pipeline directly from an uploaded or local video file."""
     import subprocess
@@ -184,7 +227,10 @@ def run_pipeline_for_file(
     candidates = generate_candidate_segments(transcript)
     if not candidates:
         notify("error", 100, "No valid segments between 15 and 60 seconds found.")
-        append_to_run_log(video_id, "upload", 0, "FAILED", "No valid speech segments found")
+        append_to_run_log(
+            video_id, title, 0, "FAILED", "No valid speech segments found",
+            source_type="upload", ownership_confirmed=True,
+        )
         return []
 
     notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates...")
@@ -193,14 +239,24 @@ def run_pipeline_for_file(
 
     clips_info = []
     total = len(top_candidates)
+    version_id = get_next_render_version(video_output_dir)
+
     for idx, cand in enumerate(top_candidates, start=1):
-        clip_id = f"{video_id}_clip_{idx:02d}"
+        clip_id = f"{video_id}_v{version_id}_clip_{idx:02d}"
         render_pct_start = 75 + int(((idx - 0.7) / total) * 20)
         render_pct_done = 75 + int((idx / total) * 20)
         notify("render", render_pct_start, f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
         clip_mp4 = video_output_dir / f"{clip_id}.mp4"
         clip_srt = video_output_dir / f"{clip_id}.srt"
         clip_meta_file = video_output_dir / f"{clip_id}_metadata.json"
+
+        # Detect situational background music
+        mood, music_reason = detect_clip_mood(cand)
+        cand["mood"] = mood
+        cand["music_reason"] = music_reason
+        music_track = get_track_for_mood(mood)
+        cand["music_track"] = music_track
+        cand["version"] = version_id
 
         meta = create_clip_metadata(cand, metadata, clip_id)
         with open(clip_meta_file, "w", encoding="utf-8") as f:
@@ -214,8 +270,11 @@ def run_pipeline_for_file(
             mode=mode,
             burn_captions=True,
             force=True,
+            caption_color=caption_color,
+            music_track=music_track,
         )
-        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s) ready")
+        music_note = f" with {music_track['name']}" if music_track else " (no music)"
+        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s){music_note}")
 
         clips_info.append({
             "clip_id": clip_id,
@@ -223,17 +282,24 @@ def run_pipeline_for_file(
             "end": cand["end"],
             "duration": cand["duration"],
             "hook_score": cand["hook_score"],
+            "why_this_clip": cand.get("why_this_clip", ""),
+            "music_used": bool(music_track),
+            "music_track": music_track.get("name") if music_track else None,
+            "music_reason": music_reason,
             "title": meta["title"],
             "mp4": str(clip_mp4),
             "srt": str(clip_srt),
-            "mp4_url": f"/media/{video_id}/{clip_id}.mp4",
-            "srt_url": f"/media/{video_id}/{clip_id}.srt",
+            "mp4_url": f"/media/video/{video_id}/{clip_id}.mp4",
+            "srt_url": f"/media/download/{video_id}/{clip_id}.srt",
             "metadata": meta,
             "status": "pending",
         })
 
     init_review_sheet(video_output_dir, clips_info)
-    append_to_run_log(video_id, "upload", len(clips_info), "SUCCESS", f"Generated {len(clips_info)} clips")
+    append_to_run_log(
+        video_id, title, len(clips_info), "SUCCESS", f"Generated {len(clips_info)} clips (v{version_id})",
+        source_type="upload", ownership_confirmed=True,
+    )
     notify("complete", 100, f"Complete! All clips saved to {video_output_dir}")
     return clips_info
 
