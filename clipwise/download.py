@@ -140,6 +140,14 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
                 "Clipwise generates clips from completed videos or finished live stream recordings. "
                 "Please use a completed video or wait until this stream ends."
             )
+
+        # Smart speed optimization: If video is over 15 minutes, download only the first 15 mins (900s)
+        # This prevents 30-minute gigabyte download freezes while still providing plenty of footage for viral shorts
+        MAX_SEC = 900
+        if info_check.get("duration") and info_check["duration"] > MAX_SEC:
+            from yt_dlp.utils import download_range_func
+            ydl.params["download_ranges"] = download_range_func(None, [(0, MAX_SEC)])
+
         info = ydl.extract_info(url, download=True)
         if not info:
             raise RuntimeError(f"Failed to fetch metadata for URL: {url}")

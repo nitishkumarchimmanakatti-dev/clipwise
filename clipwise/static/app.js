@@ -20,6 +20,26 @@ const progressBar = document.getElementById('progressBar');
 const progressPercentage = document.getElementById('progressPercentage');
 const currentStepText = document.getElementById('currentStepText');
 const logsConsole = document.getElementById('logsConsole');
+const elapsedTimer = document.getElementById('elapsedTimer');
+
+let startTime = null;
+let timerInterval = null;
+
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  startTime = Date.now();
+  if (elapsedTimer) elapsedTimer.textContent = '⏱ 0s';
+  timerInterval = setInterval(() => {
+    if (!startTime) return;
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    if (elapsedTimer) elapsedTimer.textContent = `⏱ ${elapsed}s`;
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+}
 
 const resultsSection = document.getElementById('resultsSection');
 const clipsGrid = document.getElementById('clipsGrid');
@@ -43,6 +63,7 @@ generateForm.addEventListener('submit', async (e) => {
   resultsSection.classList.add('hidden');
   logsConsole.innerHTML = '';
   updateProgress(5, 'Submitting job...');
+  startTimer();
 
   try {
     const res = await fetch('/api/generate', {
@@ -111,12 +132,14 @@ function startPolling(taskId, videoId) {
 
       if (task.status === 'completed') {
         clearInterval(pollInterval);
+        stopTimer();
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
         progressSection.classList.add('hidden');
         loadClipsForVideo(videoId);
       } else if (task.status === 'failed') {
         clearInterval(pollInterval);
+        stopTimer();
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
         alert(`Pipeline error: ${task.error}`);
@@ -291,6 +314,7 @@ if (uploadSubmitBtn) {
     resultsSection.classList.add('hidden');
     logsConsole.innerHTML = '';
     updateProgress(5, 'Uploading local video...');
+    startTimer();
 
     const formData = new FormData();
     formData.append('file', file);

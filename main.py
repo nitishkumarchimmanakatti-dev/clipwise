@@ -56,7 +56,7 @@ def run_pipeline(
     # 2. Transcribe Audio
     notify("transcribe", 40, "Transcribing speech and extracting word timestamps with faster-whisper...")
     transcript_file = video_output_dir / "transcript.json"
-    transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force)
+    transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force, progress_callback=notify)
     notify("transcribe", 60, f"Transcribed {len(transcript.get('segments', []))} speech segments")
 
     # 3. Candidate Segmentation
@@ -78,7 +78,9 @@ def run_pipeline(
 
     for idx, cand in enumerate(top_candidates, start=1):
         clip_id = f"{video_id}_clip_{idx:02d}"
-        notify("render", 75 + int((idx / total) * 20), f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
+        render_pct_start = 75 + int(((idx - 0.7) / total) * 20)
+        render_pct_done = 75 + int((idx / total) * 20)
+        notify("render", render_pct_start, f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
 
         clip_mp4 = video_output_dir / f"{clip_id}.mp4"
         clip_srt = video_output_dir / f"{clip_id}.srt"
@@ -99,6 +101,7 @@ def run_pipeline(
             burn_captions=True,
             force=force,
         )
+        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s) ready")
 
         clips_info.append({
             "clip_id": clip_id,
@@ -174,7 +177,7 @@ def run_pipeline_for_file(
 
     notify("transcribe", 40, "Transcribing speech and extracting word timestamps with faster-whisper...")
     transcript_file = video_output_dir / "transcript.json"
-    transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force)
+    transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force, progress_callback=notify)
     notify("transcribe", 60, f"Transcribed {len(transcript.get('segments', []))} speech segments")
 
     notify("segment", 65, "Finding candidate segments aligned to sentence boundaries (15-60s)...")
@@ -192,7 +195,9 @@ def run_pipeline_for_file(
     total = len(top_candidates)
     for idx, cand in enumerate(top_candidates, start=1):
         clip_id = f"{video_id}_clip_{idx:02d}"
-        notify("render", 75 + int((idx / total) * 20), f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
+        render_pct_start = 75 + int(((idx - 0.7) / total) * 20)
+        render_pct_done = 75 + int((idx / total) * 20)
+        notify("render", render_pct_start, f"Rendering clip {idx}/{total}: {clip_id} (Score: {cand['hook_score']}/10)...")
         clip_mp4 = video_output_dir / f"{clip_id}.mp4"
         clip_srt = video_output_dir / f"{clip_id}.srt"
         clip_meta_file = video_output_dir / f"{clip_id}_metadata.json"
@@ -210,6 +215,7 @@ def run_pipeline_for_file(
             burn_captions=True,
             force=force,
         )
+        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s) ready")
 
         clips_info.append({
             "clip_id": clip_id,

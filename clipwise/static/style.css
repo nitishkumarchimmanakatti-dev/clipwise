@@ -268,6 +268,22 @@ body {
   align-items: center;
 }
 
+.progress-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.elapsed-badge {
+  font-size: 12px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
 .progress-info h3 {
   font-size: 15px;
   font-weight: 600;
@@ -283,8 +299,15 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: var(--accent-gradient);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+  transition: width 0.4s ease;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .logs-accordion summary {

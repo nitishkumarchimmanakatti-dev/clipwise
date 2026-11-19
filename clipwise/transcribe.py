@@ -25,6 +25,7 @@ def transcribe_audio(
     output_path: Optional[Path] = None,
     model_size: str = WHISPER_MODEL,
     force: bool = False,
+    progress_callback: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Transcribe audio file using faster-whisper and capture word-level timestamps.
     
@@ -40,11 +41,14 @@ def transcribe_audio(
         with open(output_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    # Initialize model
+    # Initialize model with maximum available CPU threads for accelerated transcription
+    import os
+    num_threads = min(8, os.cpu_count() or 4)
     model = WhisperModel(
         model_size,
         device=WHISPER_DEVICE,
         compute_type=WHISPER_COMPUTE_TYPE,
+        cpu_threads=num_threads,
     )
 
     segments_generator, info = model.transcribe(
@@ -80,6 +84,16 @@ def transcribe_audio(
             "text": clean_text,
             "words": words_list,
         })
+
+        if progress_callback and info.duration and info.duration > 0:
+            pct = 40 + int((seg.end / info.duration) * 20)
+            pct = min(60, pct)
+            preview = (clean_text[:45] + "...") if len(clean_text) > 45 else (clean_text or "...")
+            progress_callback(
+                "transcribe",
+                pct,
+                f"Transcribing [{int(seg.start)}s-{int(seg.end)}s / {int(info.duration)}s]: \"{preview}\""
+            )
 
     del model
     import gc

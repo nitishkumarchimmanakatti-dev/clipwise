@@ -150,14 +150,17 @@
             <div class="spinner"></div>
             <div class="progress-info">
               <h3 id="currentStepText">Starting video processing...</h3>
-              <p id="progressPercentage">0%</p>
+              <div class="progress-meta">
+                <span id="elapsedTimer" class="elapsed-badge">⏱ 0s</span>
+                <p id="progressPercentage">0%</p>
+              </div>
             </div>
           </div>
           <div class="progress-track">
             <div id="progressBar" class="progress-fill" style="width: 0%"></div>
           </div>
-          <details class="logs-accordion">
-            <summary>View Pipeline Console Logs</summary>
+          <details id="logsAccordion" class="logs-accordion" open>
+            <summary>Live Pipeline Logs (Real-Time Terminal)</summary>
             <div id="logsConsole" class="logs-console"></div>
           </details>
         </div>
