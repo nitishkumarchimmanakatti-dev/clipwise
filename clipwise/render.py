@@ -12,7 +12,7 @@ from clipwise.config import (
     TARGET_HEIGHT,
     DEFAULT_RENDER_MODE,
 )
-from clipwise.captions import write_srt_file
+from clipwise.captions import write_srt_file, write_ass_file
 
 
 def render_clip(
@@ -45,11 +45,20 @@ def render_clip(
     start_time = candidate["start"]
     end_time = candidate["end"]
 
-    # 1. Write the .srt file
+    # 1. Write the .srt file (for downloads) and .ass file (for viral styled rendering)
     write_srt_file(
         words=candidate.get("words", []),
         output_srt_path=output_srt,
         clip_start_offset=start_time,
+        words_per_subtitle=3,
+    )
+    output_ass = output_srt.with_suffix(".ass")
+    write_ass_file(
+        words=candidate.get("words", []),
+        output_ass_path=output_ass,
+        clip_start_offset=start_time,
+        words_per_subtitle=3,
+        mode=mode,
     )
 
     # 2. Build the visual 9:16 vertical filter
@@ -68,17 +77,12 @@ def render_clip(
         )
 
     supports_burn = has_subtitles_filter()
-    has_srt_content = output_srt.exists() and output_srt.stat().st_size > 0
+    has_ass_content = output_ass.exists() and output_ass.stat().st_size > 0
 
-    if burn_captions and supports_burn and has_srt_content:
-        # Burn in subtitles via libass
-        clean_srt_path = str(output_srt.resolve()).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
-        sub_style = (
-            "FontName=Helvetica,FontSize=20,Bold=1,"
-            "PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,"
-            "BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=140"
-        )
-        filter_complex = f"{base_filter};[v0]subtitles='{clean_srt_path}':force_style='{sub_style}'[vout]"
+    if burn_captions and supports_burn and has_ass_content:
+        # Burn in stylish captions placed in the lower blur zone (video remains 100% visible)
+        clean_ass_path = str(output_ass.resolve()).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+        filter_complex = f"{base_filter};[v0]ass='{clean_ass_path}'[vout]"
         
         cmd = [
             ffmpeg_bin, "-y",
