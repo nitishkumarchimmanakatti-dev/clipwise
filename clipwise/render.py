@@ -38,9 +38,6 @@ def render_clip(
     ensure_ffmpeg()
     ffmpeg_bin = get_ffmpeg_path()
 
-    if output_mp4.exists() and not force:
-        return output_mp4
-
     output_mp4.parent.mkdir(parents=True, exist_ok=True)
     start_time = candidate["start"]
     end_time = candidate["end"]
@@ -60,6 +57,10 @@ def render_clip(
         words_per_subtitle=3,
         mode=mode,
     )
+
+    # Only skip rendering if output_mp4 exists AND output_ass exists AND not force
+    if output_mp4.exists() and output_ass.exists() and not force:
+        return output_mp4
 
     # 2. Build the visual 9:16 vertical filter
     if mode == "crop":

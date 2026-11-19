@@ -101,9 +101,9 @@ def create_ass_content(
     # In 1080x1920 canvas:
     # 16:9 video is centered vertically at Y = 656 to 1264.
     # Bottom blur spans Y = 1264 to 1920 (height = 656px).
-    # MarginV=400 places captions centered at Y ≈ 1480 (in the blur region),
-    # 216px below the video frame and 400px above bottom screen edge.
-    margin_v = 400 if mode == "blur" else 280
+    # MarginV=460 places captions centered at Y ≈ 1400-1460 (in the blur region),
+    # ~140px below the video frame and ~460px above bottom screen edge.
+    margin_v = 460 if mode == "blur" else 280
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -113,7 +113,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: ViralShort,Arial,56,&H0014F0FF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,6,3,2,60,60,{margin_v},1
+Style: ViralShort,Arial,56,&H001BF7FF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,6,3,2,60,60,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

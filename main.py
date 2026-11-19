@@ -91,7 +91,7 @@ def run_pipeline(
         with open(clip_meta_file, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
-        # Render 9:16 vertical video with burned-in subtitles
+        # Render 9:16 vertical video with burned-in subtitles (placed in bottom blur zone)
         render_clip(
             source_video=video_file,
             candidate=cand,
@@ -99,7 +99,7 @@ def run_pipeline(
             output_srt=clip_srt,
             mode=mode,
             burn_captions=True,
-            force=force,
+            force=True,
         )
         notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s) ready")
 
@@ -213,7 +213,7 @@ def run_pipeline_for_file(
             output_srt=clip_srt,
             mode=mode,
             burn_captions=True,
-            force=force,
+            force=True,
         )
         notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s) ready")
 
