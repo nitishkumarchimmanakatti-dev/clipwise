@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Dict, Any, Optional
 import subprocess
+import logging
 
 from clipwise.config import (
     ensure_ffmpeg,
@@ -14,6 +15,10 @@ from clipwise.config import (
     DEFAULT_CAPTION_COLOR,
 )
 from clipwise.captions import write_srt_file, write_ass_file
+from clipwise.crop import get_smart_crop_filter
+from clipwise.music import get_ducking_audio_filter
+
+logger = logging.getLogger("clipwise.render")
 
 
 def render_clip(
@@ -26,9 +31,12 @@ def render_clip(
     force: bool = False,
     caption_color: str = DEFAULT_CAPTION_COLOR,
     music_track: Optional[Dict[str, Any]] = None,
+    trim_silence: bool = True,
+    include_hook_overlay: bool = True,
 ) -> Path:
     """Cut, reformat to 9:16 vertical (1080x1920), burn subtitles in bottom blur band,
-    and apply situational background music with sidechain audio ducking.
+    overlay the first 5 words as large hook text for the first 2 seconds,
+    and apply background music at -20 dB with sidechain audio ducking and 0.5s fades.
     """
     ensure_ffmpeg()
     ffmpeg_bin = get_ffmpeg_path()
@@ -38,7 +46,7 @@ def render_clip(
     end_time = candidate["end"]
     clip_dur = max(1.0, round(end_time - start_time, 2))
 
-    # 1. Write the .srt file (for downloads) and .ass file (for viral styled rendering)
+    # 1. Write the .srt file (for downloads) and .ass file (for viral styled rendering + hook card)
     write_srt_file(
         words=candidate.get("words", []),
         output_srt_path=output_srt,
@@ -53,6 +61,7 @@ def render_clip(
         words_per_subtitle=3,
         mode=mode,
         caption_color=caption_color,
+        include_hook_overlay=include_hook_overlay,
     )
 
     # Only skip rendering if output_mp4 exists AND output_ass exists AND not force
@@ -60,12 +69,23 @@ def render_clip(
         return output_mp4
 
     # 2. Build the visual 9:16 vertical filter
+    base_video_filter = None
     if mode == "crop":
-        base_video_filter = (
-            f"[0:v]scale=-1:{TARGET_HEIGHT},"
-            f"crop={TARGET_WIDTH}:{TARGET_HEIGHT}:(in_w-{TARGET_WIDTH})/2:0[v0]"
+        # Attempt smart OpenCV face-centered tracking crop
+        smart_crop_str, has_face = get_smart_crop_filter(
+            video_path=source_video,
+            start_time=start_time,
+            end_time=end_time,
+            target_width=TARGET_WIDTH,
+            target_height=TARGET_HEIGHT,
         )
-    else:
+        if has_face:
+            base_video_filter = smart_crop_str
+        else:
+            # Fallback to blurred background padding when no face is found
+            logger.info("No face detected in talking-head crop mode; falling back to blurred background padding.")
+
+    if not base_video_filter:
         # Default 'blur': Blurred background with centered sharp foreground (1080x608)
         base_video_filter = (
             f"[0:v]scale={TARGET_WIDTH}:{TARGET_HEIGHT}:force_original_aspect_ratio=increase,"
@@ -99,16 +119,19 @@ def render_clip(
         "-i", str(source_video),
     ]
 
+    # Silence trimming filter component (>0.6s dead air removal)
+    silence_filter = "silenceremove=stop_periods=-1:stop_duration=0.6:stop_threshold=-35dB:detection=rms," if trim_silence else ""
+
     if has_valid_music:
         cmd.extend([
             "-stream_loop", "-1",
             "-i", music_file_path,
         ])
-        fade_out_start = max(0.1, clip_dur - 1.0)
-        # Speech + sidechain ducked music filter
+        fade_out_start = max(0.1, round(clip_dur - 0.5, 2))
+        # Speech + sidechain ducked music filter (-20 dB volume=0.10, 0.5s fade in/out)
         a_filter = (
-            f"[0:a]volume=1.0[speech];"
-            f"[1:a]afade=t=in:ss=0:d=0.5,afade=t=out:st={fade_out_start}:d=1.0,volume=0.15[music];"
+            f"[0:a]{silence_filter}volume=1.0[speech];"
+            f"[1:a]afade=t=in:ss=0:d=0.5,afade=t=out:st={fade_out_start}:d=0.5,volume=0.10[music];"
             f"[music][speech]sidechaincompress=threshold=0.08:ratio=6:attack=50:release=350[ducked_music];"
             f"[speech][ducked_music]amix=inputs=2:duration=first[aout]"
         )
@@ -119,11 +142,19 @@ def render_clip(
             "-map", "[aout]",
         ])
     else:
-        cmd.extend([
-            "-filter_complex", v_filter,
-            "-map", "[vout]",
-            "-map", "0:a?",
-        ])
+        if trim_silence:
+            full_filter = f"{v_filter};[0:a]{silence_filter}volume=1.0[aout]"
+            cmd.extend([
+                "-filter_complex", full_filter,
+                "-map", "[vout]",
+                "-map", "[aout]",
+            ])
+        else:
+            cmd.extend([
+                "-filter_complex", v_filter,
+                "-map", "[vout]",
+                "-map", "0:a?",
+            ])
 
     cmd.extend([
         "-c:v", "libx264",

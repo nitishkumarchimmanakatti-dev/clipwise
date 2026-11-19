@@ -11,6 +11,8 @@ OUTPUT_DIR = CLIPWISE_DATA_DIR / "output"
 ORIGINALS_DIR = CLIPWISE_DATA_DIR / "originals"
 DOWNLOADS_DIR = ORIGINALS_DIR  # Alias for backward-compatibility
 LOG_FILE = CLIPWISE_DATA_DIR / "clipwise_log.csv"
+CLIPWISE_MUSIC_DIR = Path(os.getenv("CLIPWISE_MUSIC_DIR", str(Path.home() / "Clipwise" / "music")))
+MUSIC_LICENSES_FILE = CLIPWISE_MUSIC_DIR / "music_licenses.csv"
 
 # Storage, Upload & Security Constraints
 MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "2000"))  # 2GB generous limit
@@ -27,6 +29,7 @@ CAPTION_BOTTOM_CLEARANCE = 150
 # Ensure essential base folders exist
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 ORIGINALS_DIR.mkdir(parents=True, exist_ok=True)
+CLIPWISE_MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
 # Clip constraints
 MIN_CLIP_DURATION = 15.0  # seconds

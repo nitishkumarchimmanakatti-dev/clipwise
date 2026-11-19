@@ -48,7 +48,7 @@ def extract_video_id(url: str) -> str:
     raise ValueError(f"Could not extract a valid YouTube video ID from URL: {url}")
 
 
-def validate_youtube_url(url: str, ownership_confirmed: bool = False) -> str:
+def validate_youtube_url(url: str, ownership_confirmed: bool = False, rights_confirmed: bool = False) -> str:
     """Validate that the input is a single YouTube video URL (disallowing playlists and channels)
     and that the user has verified ownership.
     """
@@ -56,7 +56,7 @@ def validate_youtube_url(url: str, ownership_confirmed: bool = False) -> str:
     if not clean_url:
         raise ValueError("Provided URL is empty.")
 
-    if not ownership_confirmed:
+    if not (ownership_confirmed or rights_confirmed):
         raise ValueError(
             "Copyright confirmation required: You must check 'I own the rights to this video' "
             "to process a YouTube URL."
@@ -84,13 +84,14 @@ def download_video(
     url: str,
     force: bool = False,
     ownership_confirmed: bool = True,
+    rights_confirmed: bool = True,
 ) -> Tuple[Path, Path, Dict[str, Any]]:
     """Download best mp4 under 1080p and extract audio for transcription.
     
     Returns:
         (video_file_path, audio_file_path, metadata_dict)
     """
-    video_id = validate_youtube_url(url, ownership_confirmed=ownership_confirmed)
+    video_id = validate_youtube_url(url, ownership_confirmed=ownership_confirmed, rights_confirmed=rights_confirmed)
     dest_dir = DOWNLOADS_DIR / video_id
     dest_dir.mkdir(parents=True, exist_ok=True)
 

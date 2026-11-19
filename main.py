@@ -48,10 +48,14 @@ def run_pipeline(
     use_llm: bool = False,
     progress_callback=None,
     ownership_confirmed: bool = True,
+    rights_confirmed: bool = True,
     caption_color: str = DEFAULT_CAPTION_COLOR,
 ):
     """Run full end-to-end processing pipeline for a single YouTube video."""
     ensure_ffmpeg()
+
+    if not (ownership_confirmed and rights_confirmed):
+        raise ValueError("Processing refused: 'rights_confirmed' must be explicitly confirmed (True).")
 
     def notify(step: str, percent: int, message: str):
         if progress_callback:
@@ -173,11 +177,15 @@ def run_pipeline_for_file(
     mode: str = DEFAULT_RENDER_MODE,
     use_llm: bool = False,
     progress_callback=None,
+    rights_confirmed: bool = True,
     caption_color: str = DEFAULT_CAPTION_COLOR,
 ):
     """Run pipeline directly from an uploaded or local video file."""
     import subprocess
     ensure_ffmpeg()
+
+    if not rights_confirmed:
+        raise ValueError("Processing refused: 'rights_confirmed' must be explicitly confirmed (True).")
 
     def notify(step: str, percent: int, message: str):
         if progress_callback:

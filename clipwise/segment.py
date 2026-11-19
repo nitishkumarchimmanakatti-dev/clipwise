@@ -20,6 +20,36 @@ DEPENDENT_PHRASES = [
     "in the last part", "jaise maine pehle kaha", "pichli video mein", "jaise pehle bataya"
 ]
 
+HOOK_WORDS = {
+    "secret", "mistake", "truth", "why", "how", "stop", "never", "always",
+    "proven", "crazy", "warning", "trick", "insane", "hack", "nobody", "shocking",
+    "raaz", "galti", "sach", "kyun", "kaise", "asliyat", "dekho", "zaroori"
+}
+
+
+def score_sentence_hook_strength(sentence: Dict[str, Any]) -> float:
+    """Evaluate hook strength of an opening sentence (0.0 to 10.0)."""
+    text = sentence.get("text", "").lower()
+    words = sentence.get("words", [])
+    if is_filler_or_weak_start(words):
+        return 0.5
+
+    score = 4.0
+    if "?" in text:
+        score += 3.5
+    elif "!" in text:
+        score += 1.5
+
+    for hw in HOOK_WORDS:
+        if hw in text:
+            score += 2.0
+            break
+
+    if re.search(r"\b\d+\b", text):
+        score += 1.5
+
+    return min(10.0, score)
+
 
 def is_filler_or_weak_start(first_words: List[Dict[str, Any]]) -> bool:
     """Detect if the opening words consist of filler, greeting, or mid-thought conjunction."""
@@ -118,6 +148,14 @@ def generate_candidate_segments(
         if is_filler_or_weak_start(start_sentence["words"]):
             # Allow sentence only if it contains a strong question or exclamation hook
             if not any(p in start_sentence["text"] for p in ["?", "!"]):
+                continue
+
+        # Hook Realignment: If current sentence is weak/introductory and next sentence is a strong hook,
+        # prefer starting directly on the strongest hook sentence
+        if i + 1 < num_sentences:
+            curr_hook = score_sentence_hook_strength(start_sentence)
+            next_hook = score_sentence_hook_strength(sentences[i + 1])
+            if curr_hook < 4.0 and next_hook >= 5.5:
                 continue
 
         accumulated_words: List[Dict[str, Any]] = []

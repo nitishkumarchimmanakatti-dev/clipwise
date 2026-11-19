@@ -95,6 +95,7 @@ class GenerateRequest(BaseModel):
     use_llm: bool = False
     force: bool = True
     ownership_confirmed: bool = False
+    rights_confirmed: bool = False
     caption_color: str = DEFAULT_CAPTION_COLOR
 
 
@@ -186,10 +187,10 @@ async def start_generation(
     _auth: None = Depends(require_auth),
 ):
     """Submit a YouTube URL for processing (requires ownership confirmation)."""
-    if not req.ownership_confirmed:
+    if not (req.ownership_confirmed or req.rights_confirmed):
         raise HTTPException(
             status_code=400,
-            detail="Ownership confirmation required. You must check 'I own the rights to this video'."
+            detail="Rights confirmation required. You must check 'I own the rights to this video'."
         )
 
     try:
@@ -228,6 +229,7 @@ async def start_generation(
                 use_llm=req.use_llm,
                 progress_callback=on_progress,
                 ownership_confirmed=True,
+                rights_confirmed=True,
                 caption_color=req.caption_color,
             )
             tasks[task_id]["status"] = "completed"
@@ -311,6 +313,7 @@ async def upload_and_process_video(
                     mode=mode,
                     use_llm=use_llm,
                     progress_callback=on_progress,
+                    rights_confirmed=True,
                     caption_color=caption_color,
                 )
                 tasks[task_id]["status"] = "completed"

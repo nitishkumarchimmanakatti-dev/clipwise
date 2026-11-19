@@ -114,6 +114,7 @@ def create_clip_metadata(
             "url": source_url,
             "segment_range": f"{start_str} - {end_str}"
         },
+        "rights_confirmed": bool(candidate.get("rights_confirmed", source_metadata.get("rights_confirmed", True))),
         "transcript_excerpt": candidate["text"]
     }
 

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import List, Dict, Any
+import re
 from clipwise.config import DEFAULT_CAPTION_COLOR
 
 
@@ -127,12 +128,14 @@ def create_ass_content(
     words_per_subtitle: int = 3,
     mode: str = "blur",
     caption_color: str = DEFAULT_CAPTION_COLOR,
+    include_hook_overlay: bool = True,
 ) -> str:
     """Generate high-retention, stylish ASS subtitle file.
     
     Positioned strictly in the lower blurred region (Y ≈ 1400 to 1700) with
     at least 150px clearance from the bottom edge of the sharp 16:9 video frame.
     Supports Noto Sans Devanagari for Hindi/Hinglish rendering without blank boxes.
+    Optionally overlays the first 5 words as a large prominent hook card for the first 2 seconds.
     """
     margin_v = 460 if mode == "blur" else 280
     primary_color_ass = hex_to_ass_color(caption_color)
@@ -146,12 +149,23 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: ViralShort,Noto Sans,56,{primary_color_ass},&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,6,3,2,60,60,{margin_v},1
+Style: HookOverlay,Noto Sans,68,{primary_color_ass},&H000000FF,&H00000000,&HB0000000,-1,0,0,0,100,100,2,0,1,8,4,8,80,80,360,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     if not words:
         return header
+
+    dialogue_lines: List[str] = []
+
+    # Large hook overlay for first 5 words during the first 2 seconds
+    if include_hook_overlay and words:
+        first_5_words = " ".join(re.sub(r"[^\w\s\?!\'\"-]", "", w.get("word", "")).strip() for w in words[:5])
+        first_5_words = first_5_words.strip().upper()
+        if first_5_words:
+            hook_text = wrap_caption_lines(first_5_words, max_chars_per_line=24, max_lines=2)
+            dialogue_lines.append(f"Dialogue: 1,0:00:00.00,0:00:02.00,HookOverlay,,0,0,0,,{{\\fad(120,200)}}{hook_text}")
 
     subtitles = []
     current_chunk: List[Dict[str, Any]] = []
@@ -165,7 +179,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if current_chunk:
         subtitles.append(current_chunk)
 
-    dialogue_lines: List[str] = []
     for chunk in subtitles:
         rel_start = max(0.0, chunk[0]["start"] - clip_start_offset)
         rel_end = max(rel_start + 0.35, chunk[-1]["end"] - clip_start_offset)
@@ -191,6 +204,7 @@ def write_ass_file(
     words_per_subtitle: int = 3,
     mode: str = "blur",
     caption_color: str = DEFAULT_CAPTION_COLOR,
+    include_hook_overlay: bool = True,
 ) -> Path:
     """Write an .ass subtitle file with viral typography and blur-zone positioning."""
     ass_content = create_ass_content(
@@ -199,6 +213,7 @@ def write_ass_file(
         words_per_subtitle=words_per_subtitle,
         mode=mode,
         caption_color=caption_color,
+        include_hook_overlay=include_hook_overlay,
     )
     output_ass_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_ass_path, "w", encoding="utf-8") as f:
