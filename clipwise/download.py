@@ -91,10 +91,13 @@ def download_video(url: str, force: bool = False) -> Tuple[Path, Path, Dict[str,
         return video_file, audio_file, metadata
 
     ydl_opts = {
-        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
         "outtmpl": video_target_pattern,
         "noplaylist": True,
         "merge_output_format": "mp4",
+        "concurrent_fragment_downloads": 5,
+        "js_runtimes": {"node": {}},
+        "remote_components": {"ejs:github"},
         "quiet": False,
         "no_warnings": False,
         "postprocessors": [

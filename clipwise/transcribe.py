@@ -37,7 +37,8 @@ def transcribe_audio(
 
     segments_generator, info = model.transcribe(
         str(audio_path),
-        beam_size=5,
+        beam_size=1,
+        best_of=1,
         word_timestamps=True,
         vad_filter=True,
     )
