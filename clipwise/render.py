@@ -31,8 +31,8 @@ def render_clip(
     force: bool = False,
     caption_color: str = DEFAULT_CAPTION_COLOR,
     music_track: Optional[Dict[str, Any]] = None,
-    trim_silence: bool = True,
-    include_hook_overlay: bool = True,
+    trim_silence: bool = False,
+    include_hook_overlay: bool = False,
 ) -> Path:
     """Cut, reformat to 9:16 vertical (1080x1920), burn subtitles in bottom blur band,
     overlay the first 5 words as large hook text for the first 2 seconds,

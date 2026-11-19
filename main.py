@@ -162,7 +162,7 @@ def run_pipeline(
         with open(clip_meta_file, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
-        # Render 9:16 vertical video with burned-in subtitles (placed in bottom blur zone) and ducked music
+        # Render 9:16 vertical video with burned-in subtitles (placed in bottom blur zone)
         render_clip(
             source_video=video_file,
             candidate=cand,
@@ -172,10 +172,8 @@ def run_pipeline(
             burn_captions=True,
             force=True,
             caption_color=caption_color,
-            music_track=music_track,
         )
-        music_note = f" with {music_track['name']}" if music_track else " (no music)"
-        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s){music_note}")
+        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s)")
 
         clips_info.append({
             "clip_id": clip_id,
@@ -337,10 +335,8 @@ def run_pipeline_for_file(
             burn_captions=True,
             force=True,
             caption_color=caption_color,
-            music_track=music_track,
         )
-        music_note = f" with {music_track['name']}" if music_track else " (no music)"
-        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s){music_note}")
+        notify("render", render_pct_done, f"✓ Rendered clip {idx}/{total}: {clip_id} ({int(cand['duration'])}s)")
 
         clips_info.append({
             "clip_id": clip_id,
