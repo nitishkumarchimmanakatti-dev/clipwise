@@ -355,7 +355,20 @@ document.addEventListener('DOMContentLoaded', () => {
           clearInterval(pollInterval);
           stopTimer();
           resetSubmitBtns();
-          alert(`Pipeline ended: ${task.error || task.status}`);
+          const errText = (task.error || task.status || '').toLowerCase();
+          if (errText.includes('sign in to confirm') || errText.includes('not a bot') || errText.includes('cookies')) {
+            alert(
+              "⚠️ YouTube Cloud Block Detected\n\n" +
+              "YouTube blocks automated downloads on cloud datacenter servers (like Railway/AWS) with a bot challenge.\n\n" +
+              "👉 SOLUTION: Please switch to the 'Upload Video (Primary)' tab and upload your MP4/MOV file directly. Direct file uploads are 100% reliable and never blocked by YouTube!\n\n" +
+              "(Or run Clipwise locally on your Mac at http://127.0.0.1:8000 where your residential connection is not restricted)."
+            );
+            // Automatically switch user to the Upload Video tab
+            const uploadTab = document.querySelector('[data-tab="upload"]');
+            if (uploadTab) uploadTab.click();
+          } else {
+            alert(`Pipeline ended: ${task.error || task.status}`);
+          }
         }
       } catch (err) {
         console.error('Polling error:', err);

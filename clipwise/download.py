@@ -175,7 +175,13 @@ def download_video(
                 raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
     except Exception as e:
         err_msg = str(e)
-        if "Sign in to confirm you're not a bot" in err_msg or "Sign in to confirm" in err_msg:
+        lower_err = err_msg.lower()
+        if (
+            "sign in to confirm" in lower_err
+            or "not a bot" in lower_err
+            or "cookies" in lower_err
+            or ("bot" in lower_err and "confirm" in lower_err)
+        ):
             raise RuntimeError(
                 "YouTube has blocked this cloud server with an anti-bot challenge for this video. "
                 "👉 Solution: Please switch to the 'Upload Video' tab to upload your video file directly "
