@@ -113,7 +113,7 @@ def download_video(
         "concurrent_fragment_downloads": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "android", "web"],
+                "player_client": ["android", "ios"],
             }
         },
         "js_runtimes": {"node": {}},
@@ -149,28 +149,43 @@ def download_video(
     if cookies_file and cookies_file.exists():
         ydl_opts["cookiefile"] = str(cookies_file)
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        # Extract metadata first to check if video is an ongoing live stream
-        info_check = ydl.extract_info(url, download=False)
-        if not info_check:
-            raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
-        if info_check.get("is_live") or info_check.get("live_status") == "is_live":
-            raise ValueError(
-                "This YouTube video is currently an ACTIVE LIVE STREAM! "
-                "Clipwise generates clips from completed videos or finished live stream recordings. "
-                "Please use a completed video or wait until this stream ends."
-            )
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Extract metadata first to check if video is an ongoing live stream
+            info_check = ydl.extract_info(url, download=False)
+            if not info_check:
+                raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
+            if info_check.get("is_live") or info_check.get("live_status") == "is_live":
+                raise ValueError(
+                    "This YouTube video is currently an ACTIVE LIVE STREAM! "
+                    "Clipwise generates clips from completed videos or finished live stream recordings. "
+                    "Please use a completed video or wait until this stream ends."
+                )
 
-        # Smart speed optimization: If video is over 15 minutes, download only the first 15 mins (900s)
-        # This prevents 30-minute gigabyte download freezes while still providing plenty of footage for viral shorts
-        MAX_SEC = 900
-        if info_check.get("duration") and info_check["duration"] > MAX_SEC:
-            from yt_dlp.utils import download_range_func
-            ydl.params["download_ranges"] = download_range_func(None, [(0, MAX_SEC)])
+            # Smart speed optimization: If video is over 15 minutes, download only the first 15 mins (900s)
+            # This prevents 30-minute gigabyte download freezes while still providing plenty of footage for viral shorts
+            MAX_SEC = 900
+            if info_check.get("duration") and info_check["duration"] > MAX_SEC:
+                from yt_dlp.utils import download_range_func
+                ydl.params["download_ranges"] = download_range_func(None, [(0, MAX_SEC)])
 
-        info = ydl.extract_info(url, download=True)
-        if not info:
-            raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
+            info = ydl.extract_info(url, download=True)
+            if not info:
+                raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
+    except Exception as e:
+        err_msg = str(e)
+        if "Sign in to confirm you're not a bot" in err_msg or "Sign in to confirm" in err_msg:
+            raise RuntimeError(
+                "YouTube has blocked this cloud server with an anti-bot challenge for this video. "
+                "👉 Solution: Please switch to the 'Upload Video' tab to upload your video file directly "
+                "(which is 100% reliable and never blocked), or run Clipwise locally on your Mac."
+            ) from e
+        if "This live event has ended" in err_msg:
+            raise RuntimeError(
+                "This YouTube Live stream has ended and the recording is not yet available for processing. "
+                "Please use a completed YouTube video or upload the video directly via the 'Upload Video' tab."
+            ) from e
+        raise
 
     # Save clean metadata
     metadata = {
