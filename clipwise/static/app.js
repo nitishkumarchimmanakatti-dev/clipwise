@@ -60,6 +60,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeLoginModalBtn = document.getElementById('closeLoginModalBtn');
   const loginError = document.getElementById('loginError');
 
+  // Error Card and Dynamic Config Elements
+  const tabsHeader = document.getElementById('tabsHeader');
+  const uploadRightsCheckbox = document.getElementById('uploadRightsCheckbox');
+  const errorCardSection = document.getElementById('errorCardSection');
+  const errorCardTitle = document.getElementById('errorCardTitle');
+  const errorCardMessage = document.getElementById('errorCardMessage');
+  const errorCardSuggestion = document.getElementById('errorCardSuggestion');
+  const dismissErrorBtn = document.getElementById('dismissErrorBtn');
+
   const viewHistoryBtn = document.getElementById('viewHistoryBtn');
   const historyModal = document.getElementById('historyModal');
   const closeModalBtn = document.getElementById('closeModalBtn');
@@ -146,6 +155,54 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   loadMusicCatalog();
 
+  // Real Error Banner Helpers
+  function showErrorBanner(title, message, suggestion = '') {
+    if (!errorCardSection) return;
+    if (errorCardTitle) errorCardTitle.textContent = title;
+    if (errorCardMessage) errorCardMessage.textContent = message;
+    if (errorCardSuggestion) {
+      if (suggestion) {
+        errorCardSuggestion.innerHTML = suggestion;
+        errorCardSuggestion.classList.remove('hidden');
+      } else {
+        errorCardSuggestion.innerHTML = '';
+        errorCardSuggestion.classList.add('hidden');
+      }
+    }
+    errorCardSection.classList.remove('hidden');
+    errorCardSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function hideErrorBanner() {
+    if (errorCardSection) errorCardSection.classList.add('hidden');
+  }
+
+  if (dismissErrorBtn) {
+    dismissErrorBtn.addEventListener('click', hideErrorBanner);
+  }
+
+  // Dynamic Server Config (Detect if YouTube URL is enabled or disabled)
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) {
+        const config = await res.json();
+        if (!config.enable_youtube) {
+          // Cloud environment: Disable & hide YouTube URL features
+          if (tabsHeader) tabsHeader.classList.add('hidden');
+          if (youtubeInputGroup) youtubeInputGroup.classList.add('hidden');
+          if (ownershipBanner) ownershipBanner.classList.add('hidden');
+          if (tabUpload) tabUpload.classList.add('active');
+          if (uploadInputGroup) uploadInputGroup.classList.remove('hidden');
+          if (youtubeUrl) youtubeUrl.removeAttribute('required');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load server config:', e);
+    }
+  }
+  loadConfig();
+
   // Auth Status Check
   async function checkAuthStatus() {
     try {
@@ -201,15 +258,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // YouTube Submission Handler
   async function handleYoutubeSubmit() {
+    hideErrorBanner();
     const url = youtubeUrl.value.trim();
     if (!url) {
-      alert("Please enter a YouTube video URL first.");
+      showErrorBanner('Missing YouTube URL', 'Please enter a valid YouTube video URL first.');
       youtubeUrl.focus();
       return;
     }
 
     if (!ownershipCheckbox.checked) {
-      alert("Copyright confirmation required: Please check 'I own the rights to this video' below the URL.");
+      showErrorBanner('Copyright Confirmation Required', "Please confirm that you own the rights to this video by checking the checkbox below the URL.");
       ownershipCheckbox.focus();
       return;
     }
@@ -250,7 +308,13 @@ document.addEventListener('DOMContentLoaded', () => {
       stopTimer();
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
-      alert(`Submission error: ${err.message}`);
+      progressSection.classList.add('hidden');
+
+      let suggestion = '';
+      if (err.message.includes('disabled') || err.message.includes('cloud')) {
+        suggestion = '👉 <strong>Solution:</strong> YouTube URLs are disabled on cloud hosting due to anti-bot IP blocks. Please use the <strong>Upload Video</strong> tab to upload your MP4/MOV file directly.';
+      }
+      showErrorBanner('Submission Error', err.message, suggestion);
     }
   }
 
@@ -275,9 +339,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Upload Submission
   uploadSubmitBtn.addEventListener('click', async () => {
+    hideErrorBanner();
     const file = videoFile.files[0];
     if (!file) {
-      alert('Please select a video file (MP4/MOV) first.');
+      showErrorBanner('No Video File Selected', 'Please choose an MP4, MOV, or WEBM video file to upload.');
+      return;
+    }
+
+    if (uploadRightsCheckbox && !uploadRightsCheckbox.checked) {
+      showErrorBanner('Ownership Confirmation Required', 'Please check the box confirming you own the rights or have permission to process this video.');
+      uploadRightsCheckbox.focus();
       return;
     }
 
@@ -295,6 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('mode', renderMode.value);
     formData.append('use_llm', useLlm.checked ? 'true' : 'false');
     formData.append('caption_color', captionColorSelect.value);
+    formData.append('rights_confirmed', 'true');
 
     try {
       const res = await fetch('/api/upload', {
@@ -315,7 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
       stopTimer();
       uploadSubmitBtn.disabled = false;
       uploadSubmitBtn.innerHTML = '<span>Upload & Generate</span><span class="btn-arrow">→</span>';
-      alert(`Upload error: ${err.message}`);
+      progressSection.classList.add('hidden');
+      showErrorBanner('Upload Failed', err.message);
     }
   });
 
@@ -355,7 +428,27 @@ document.addEventListener('DOMContentLoaded', () => {
           clearInterval(pollInterval);
           stopTimer();
           resetSubmitBtns();
-          alert(`Pipeline ended: ${task.error || task.status}`);
+          progressSection.classList.add('hidden');
+
+          let title = 'Pipeline Failed';
+          let message = task.error || 'The video processing pipeline encountered an error.';
+          let suggestion = '';
+
+          const lowerErr = (task.error || '').toLowerCase();
+          if (lowerErr.includes('sign in to confirm') || lowerErr.includes('bot') || lowerErr.includes('cloud server')) {
+            title = 'YouTube Download Blocked by YouTube';
+            message = 'YouTube blocked automated downloading from this cloud server (IP flagged for bot verification).';
+            suggestion = '👉 <strong>Solution:</strong> Please use the <strong>Upload Video</strong> option to upload your video directly. Uploaded files do not rely on YouTube and process with 100% reliability.';
+          } else if (lowerErr.includes('no speech') || lowerErr.includes('speech detected')) {
+            title = 'No Speech Detected in Video';
+            message = 'No spoken dialogue or speech was detected by Whisper in this video.';
+            suggestion = '👉 <strong>Suggestion:</strong> Clipwise requires spoken words to generate timed hooks and subtitles. Please upload a video file with clear audible speech.';
+          } else if (task.status === 'cancelled') {
+            title = 'Job Cancelled';
+            message = 'The processing task was cancelled.';
+          }
+
+          showErrorBanner(title, message, suggestion);
         }
       } catch (err) {
         console.error('Polling error:', err);

@@ -14,6 +14,7 @@ except Exception:
 import argparse
 import sys
 import json
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -35,6 +36,7 @@ from clipwise.review import (
     set_clip_status,
     get_all_pending_clips,
     append_to_run_log,
+    log_pipeline_stage,
 )
 from clipwise.music import detect_clip_mood, get_track_for_mood
 from clipwise.storage import get_next_render_version
@@ -70,23 +72,49 @@ def run_pipeline(
 
     # 1. Download Video & Audio
     notify("download", 15, "Downloading video and extracting audio via yt-dlp...")
-    video_file, audio_file, metadata = download_video(
-        url,
-        force=force,
-        ownership_confirmed=ownership_confirmed,
-    )
+    t_download = time.time()
+    try:
+        video_file, audio_file, metadata = download_video(
+            url,
+            force=force,
+            ownership_confirmed=ownership_confirmed,
+            rights_confirmed=rights_confirmed,
+        )
+        download_dur = time.time() - t_download
+        log_pipeline_stage(video_id, "download", "SUCCESS", download_dur, f"Downloaded '{metadata.get('title', '')}'")
+    except Exception as e:
+        download_dur = time.time() - t_download
+        log_pipeline_stage(video_id, "download", "FAILED", download_dur, str(e))
+        raise
+
     notify("download", 30, f"Downloaded '{metadata.get('title', '')}' ({metadata.get('duration', 0)}s)")
 
     # 2. Transcribe Audio
     notify("transcribe", 40, "Transcribing speech and extracting word timestamps with faster-whisper...")
+    t_transcribe = time.time()
     transcript_file = video_output_dir / "transcript.json"
     transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force, progress_callback=notify)
-    notify("transcribe", 60, f"Transcribed {len(transcript.get('segments', []))} speech segments")
+    transcribe_dur = time.time() - t_transcribe
+
+    # Explicit No-Speech Detection
+    segments = transcript.get("segments", [])
+    if not segments or not transcript.get("full_text", "").strip():
+        log_pipeline_stage(video_id, "transcribe", "FAILED", transcribe_dur, "No speech detected")
+        raise ValueError(
+            "No speech detected in this video. Clipwise relies on spoken words to detect hooks and generate subtitles. "
+            "Please upload a different video containing dialogue or speech."
+        )
+
+    log_pipeline_stage(video_id, "transcribe", "SUCCESS", transcribe_dur, f"Transcribed {len(segments)} segments")
+    notify("transcribe", 60, f"Transcribed {len(segments)} speech segments")
 
     # 3. Candidate Segmentation
     notify("segment", 65, "Finding candidate segments aligned to sentence boundaries (15-60s)...")
+    t_segment = time.time()
     candidates = generate_candidate_segments(transcript)
     if not candidates:
+        segment_dur = time.time() - t_segment
+        log_pipeline_stage(video_id, "segment", "FAILED", segment_dur, "No valid segments between 15 and 60 seconds found")
         notify("error", 100, "No valid segments between 15 and 60 seconds found.")
         append_to_run_log(
             video_id, url, 0, "FAILED", "No valid speech segments found",
@@ -97,12 +125,15 @@ def run_pipeline(
     # 4. Hook Scoring & Ranking
     notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates...")
     top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips)
+    segment_dur = time.time() - t_segment
+    log_pipeline_stage(video_id, "segment", "SUCCESS", segment_dur, f"Found {len(candidates)} candidates, ranked top {len(top_candidates)}")
     notify("score", 75, f"Selected top {len(top_candidates)} engaging clips")
 
     # 5. Render Clips & Captions
     clips_info = []
     total = len(top_candidates)
     version_id = get_next_render_version(video_output_dir)
+    t_render = time.time()
 
     for idx, cand in enumerate(top_candidates, start=1):
         clip_id = f"{video_id}_v{version_id}_clip_{idx:02d}"
@@ -157,6 +188,9 @@ def run_pipeline(
             "srt": str(clip_srt),
             "metadata": meta,
         })
+
+    render_dur = time.time() - t_render
+    log_pipeline_stage(video_id, "render", "SUCCESS", render_dur, f"Rendered {len(clips_info)} clips (v{version_id})")
 
     # 6. Initialize Review Sheet & Log
     init_review_sheet(video_output_dir, clips_info)
@@ -227,13 +261,29 @@ def run_pipeline_for_file(
     }
 
     notify("transcribe", 40, "Transcribing speech and extracting word timestamps with faster-whisper...")
+    t_transcribe = time.time()
     transcript_file = video_output_dir / "transcript.json"
     transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force, progress_callback=notify)
-    notify("transcribe", 60, f"Transcribed {len(transcript.get('segments', []))} speech segments")
+    transcribe_dur = time.time() - t_transcribe
+
+    # Explicit No-Speech Detection
+    segments = transcript.get("segments", [])
+    if not segments or not transcript.get("full_text", "").strip():
+        log_pipeline_stage(video_id, "transcribe", "FAILED", transcribe_dur, "No speech detected")
+        raise ValueError(
+            "No speech detected in this video. Clipwise relies on spoken words to detect hooks and generate subtitles. "
+            "Please upload a different video containing dialogue or speech."
+        )
+
+    log_pipeline_stage(video_id, "transcribe", "SUCCESS", transcribe_dur, f"Transcribed {len(segments)} segments")
+    notify("transcribe", 60, f"Transcribed {len(segments)} speech segments")
 
     notify("segment", 65, "Finding candidate segments aligned to sentence boundaries (15-60s)...")
+    t_segment = time.time()
     candidates = generate_candidate_segments(transcript)
     if not candidates:
+        segment_dur = time.time() - t_segment
+        log_pipeline_stage(video_id, "segment", "FAILED", segment_dur, "No valid speech segments found")
         notify("error", 100, "No valid segments between 15 and 60 seconds found.")
         append_to_run_log(
             video_id, title, 0, "FAILED", "No valid speech segments found",
@@ -243,11 +293,14 @@ def run_pipeline_for_file(
 
     notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates...")
     top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips)
+    segment_dur = time.time() - t_segment
+    log_pipeline_stage(video_id, "segment", "SUCCESS", segment_dur, f"Found {len(candidates)} candidates, ranked top {len(top_candidates)}")
     notify("score", 75, f"Selected top {len(top_candidates)} engaging clips")
 
     clips_info = []
     total = len(top_candidates)
     version_id = get_next_render_version(video_output_dir)
+    t_render = time.time()
 
     for idx, cand in enumerate(top_candidates, start=1):
         clip_id = f"{video_id}_v{version_id}_clip_{idx:02d}"
@@ -302,6 +355,9 @@ def run_pipeline_for_file(
             "metadata": meta,
             "status": "pending",
         })
+
+    render_dur = time.time() - t_render
+    log_pipeline_stage(video_id, "render", "SUCCESS", render_dur, f"Rendered {len(clips_info)} clips (v{version_id})")
 
     init_review_sheet(video_output_dir, clips_info)
     append_to_run_log(

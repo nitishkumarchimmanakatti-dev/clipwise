@@ -54,9 +54,9 @@
         </div>
 
         <div class="generator-card">
-          <div class="tabs-header">
+          <div class="tabs-header" id="tabsHeader">
             <button type="button" id="tabUpload" class="tab-btn active"><span>📤 Upload Video (Primary)</span></button>
-            <button type="button" id="tabYoutube" class="tab-btn"><span>📺 YouTube URL (Secondary)</span></button>
+            <button type="button" id="tabYoutube" class="tab-btn"><span>📺 YouTube URL (Local Dev Only)</span></button>
           </div>
 
           <form id="generateForm" class="generator-form" novalidate onsubmit="return false;">
@@ -74,7 +74,15 @@
               </button>
             </div>
 
-            <!-- YouTube Group (Secondary) -->
+            <!-- Mandatory Rights Confirmation for Uploads -->
+            <div id="uploadRightsBanner" class="ownership-banner">
+              <label class="ownership-label">
+                <input type="checkbox" id="uploadRightsCheckbox" checked>
+                <span><strong>I confirm that I own the rights to this video or have full permission to process it.</strong></span>
+              </label>
+            </div>
+
+            <!-- YouTube Group (Secondary, local dev only) -->
             <div id="youtubeInputGroup" class="input-group hidden">
               <span class="input-icon">🔗</span>
               <input 
@@ -94,9 +102,6 @@
                 <input type="checkbox" id="ownershipCheckbox">
                 <span><strong>I own the rights to this video.</strong> (Required by YouTube Terms of Service & Copyright Laws. Single video only.)</span>
               </label>
-              <div style="margin-top: 8px; font-size: 0.85rem; color: #a0aec0; line-height: 1.4;">
-                💡 <em>Cloud servers like Railway are frequently rate-limited by YouTube's bot detection. For 100% reliable instant processing with no bot restrictions, switch to the <strong>Upload Video</strong> tab.</em>
-              </div>
             </div>
 
             <!-- Config Options -->
@@ -133,6 +138,19 @@
               </div>
             </div>
           </form>
+        </div>
+      </section>
+
+      <!-- On-Page Real Error Banner (Never 'No clips found' on failure) -->
+      <section id="errorCardSection" class="error-card-section hidden">
+        <div id="pipelineErrorCard" class="pipeline-error-card">
+          <div class="error-card-header">
+            <span class="error-icon">⚠️</span>
+            <h4 id="errorCardTitle">Pipeline Execution Failed</h4>
+            <button type="button" id="dismissErrorBtn" class="dismiss-btn" title="Dismiss">&times;</button>
+          </div>
+          <p id="errorCardMessage" class="error-card-message"></p>
+          <div id="errorCardSuggestion" class="error-card-suggestion"></div>
         </div>
       </section>
 

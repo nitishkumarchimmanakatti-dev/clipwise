@@ -14,6 +14,7 @@ services:
       - MAX_UPLOAD_SIZE_MB=500
       - ORIGINALS_TTL_DAYS=7
       - DEFAULT_CAPTION_COLOR=#FFD700
+      - ENABLE_YOUTUBE_URL=false
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
 
