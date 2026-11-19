@@ -59,7 +59,7 @@
             <button type="button" id="tabYoutube" class="tab-btn"><span>📺 YouTube URL (Secondary)</span></button>
           </div>
 
-          <form id="generateForm" class="generator-form">
+          <form id="generateForm" class="generator-form" novalidate onsubmit="return false;">
             <!-- Upload Group (Primary) -->
             <div id="uploadInputGroup" class="input-group">
               <span class="input-icon">📁</span>
@@ -67,7 +67,6 @@
                 type="file" 
                 id="videoFile" 
                 accept="video/mp4,video/quicktime,video/webm,video/mkv"
-                required
               />
               <button type="button" id="uploadSubmitBtn" class="btn btn-primary">
                 <span>Upload & Generate</span>
@@ -83,7 +82,7 @@
                 id="youtubeUrl" 
                 placeholder="Paste Single YouTube Video URL (e.g. https://youtu.be/...)" 
               />
-              <button type="submit" id="submitBtn" class="btn btn-primary">
+              <button type="button" id="submitBtn" class="btn btn-primary">
                 <span>Generate Clips</span>
                 <span class="btn-arrow">→</span>
               </button>

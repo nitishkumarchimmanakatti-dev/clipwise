@@ -199,17 +199,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // YouTube Submission
-  generateForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!ownershipCheckbox.checked) {
-      alert("Copyright confirmation required: You must check 'I own the rights to this video' before generating clips.");
-      ownershipCheckbox.focus();
+  // YouTube Submission Handler
+  async function handleYoutubeSubmit() {
+    const url = youtubeUrl.value.trim();
+    if (!url) {
+      alert("Please enter a YouTube video URL first.");
+      youtubeUrl.focus();
       return;
     }
 
-    const url = youtubeUrl.value.trim();
-    if (!url) return;
+    if (!ownershipCheckbox.checked) {
+      alert("Copyright confirmation required: Please check 'I own the rights to this video' below the URL.");
+      ownershipCheckbox.focus();
+      return;
+    }
 
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span>Processing...</span>';
@@ -248,6 +251,25 @@ document.addEventListener('DOMContentLoaded', () => {
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<span>Generate Clips</span><span class="btn-arrow">→</span>';
       alert(`Submission error: ${err.message}`);
+    }
+  }
+
+  submitBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    handleYoutubeSubmit();
+  });
+
+  youtubeUrl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleYoutubeSubmit();
+    }
+  });
+
+  generateForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!youtubeInputGroup.classList.contains('hidden')) {
+      handleYoutubeSubmit();
     }
   });
 
