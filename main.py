@@ -24,6 +24,7 @@ from clipwise.config import (
     DEFAULT_MAX_CLIPS,
     DEFAULT_RENDER_MODE,
     DEFAULT_CAPTION_COLOR,
+    MAX_ANALYSIS_SECONDS,
 )
 from clipwise.download import download_video, validate_youtube_url
 from clipwise.transcribe import transcribe_audio
@@ -87,10 +88,13 @@ def run_pipeline(
         log_pipeline_stage(video_id, "download", "FAILED", download_dur, str(e))
         raise
 
-    notify("download", 30, f"Downloaded '{metadata.get('title', '')}' ({metadata.get('duration', 0)}s)")
+    video_dur = int(metadata.get('duration', 0))
+    notify("download", 30, f"Downloaded '{metadata.get('title', '')}' ({video_dur}s)")
+    if video_dur > MAX_ANALYSIS_SECONDS:
+        notify("download", 35, f"Optimizing speed: Analyzing first 15 mins for hooks ({MAX_ANALYSIS_SECONDS}s / {video_dur}s)...")
 
     # 2. Transcribe Audio
-    notify("transcribe", 40, "Transcribing speech and extracting word timestamps with faster-whisper...")
+    notify("transcribe", 40, f"Transcribing speech with faster-whisper ({min(video_dur, MAX_ANALYSIS_SECONDS)}s audio)...")
     t_transcribe = time.time()
     transcript_file = video_output_dir / "transcript.json"
     transcript = transcribe_audio(audio_file, output_path=transcript_file, force=force, progress_callback=notify)
@@ -236,6 +240,7 @@ def run_pipeline_for_file(
     notify("audio", 15, "Extracting audio from uploaded video...")
     cmd = [
         "ffmpeg", "-y", "-i", str(video_file_path),
+        "-t", str(MAX_ANALYSIS_SECONDS),
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
         str(audio_file)
     ]

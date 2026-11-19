@@ -37,6 +37,7 @@ MIN_CLIP_DURATION = 15.0  # seconds
 MAX_CLIP_DURATION = 60.0  # seconds
 TARGET_CLIP_DURATION = 35.0  # optimal target for short-form
 DEFAULT_MAX_CLIPS = 10
+MAX_ANALYSIS_SECONDS = int(os.getenv("MAX_ANALYSIS_SECONDS", "900"))  # 15 mins optimal max analysis for fast short generation
 
 # Whisper Configuration (Optimized for cloud memory efficiency)
 WHISPER_MODEL = os.getenv("CLIPWISE_WHISPER_MODEL", "base")

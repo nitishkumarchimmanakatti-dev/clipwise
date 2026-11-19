@@ -7,7 +7,7 @@ import re
 from urllib.parse import urlparse, parse_qs
 import yt_dlp
 
-from clipwise.config import DOWNLOADS_DIR, OUTPUT_DIR
+from clipwise.config import DOWNLOADS_DIR, OUTPUT_DIR, MAX_ANALYSIS_SECONDS
 
 
 def extract_video_id(url: str) -> str:
@@ -204,10 +204,11 @@ def download_video(
     with open(meta_file, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
-    # Also extract 16kHz mono WAV for whisper transcription
+    # Extract 16kHz mono WAV for whisper transcription (capped to MAX_ANALYSIS_SECONDS for fast transcription)
     import subprocess
     cmd = [
         "ffmpeg", "-y", "-i", str(video_file),
+        "-t", str(MAX_ANALYSIS_SECONDS),
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
         str(audio_file)
     ]
