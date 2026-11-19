@@ -19,7 +19,6 @@ MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "2000"))  # 2GB generou
 ORIGINALS_TTL_DAYS = int(os.getenv("ORIGINALS_TTL_DAYS", "14"))  # 14 days retention
 CLIPWISE_PASSWORD = os.getenv("CLIPWISE_PASSWORD", "")  # Empty means open/dev mode
 SESSION_SECRET = os.getenv("SESSION_SECRET", "clipwise-v2-super-secret-key-39824")
-ENABLE_YOUTUBE_URL = os.getenv("ENABLE_YOUTUBE_URL", "true").lower() in ("true", "1", "yes")
 
 # Caption Styling
 DEFAULT_CAPTION_COLOR = os.getenv("DEFAULT_CAPTION_COLOR", "#FFD700")  # Default warm gold
@@ -37,7 +36,6 @@ MIN_CLIP_DURATION = 15.0  # seconds
 MAX_CLIP_DURATION = 60.0  # seconds
 TARGET_CLIP_DURATION = 35.0  # optimal target for short-form
 DEFAULT_MAX_CLIPS = 10
-MAX_ANALYSIS_SECONDS = int(os.getenv("MAX_ANALYSIS_SECONDS", "900"))  # 15 mins optimal max analysis for fast short generation
 
 # Whisper Configuration (Optimized for cloud memory efficiency)
 WHISPER_MODEL = os.getenv("CLIPWISE_WHISPER_MODEL", "base")

@@ -41,19 +41,15 @@ def transcribe_audio(
         with open(output_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    # Initialize model with optimal CPU threads to prevent thread contention on cloud containers
+    # Initialize model with maximum available CPU threads for accelerated transcription
     import os
-    assigned_cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 2)
-    num_threads = max(1, min(4, assigned_cpus))
+    num_threads = min(8, os.cpu_count() or 4)
     model = WhisperModel(
         model_size,
         device=WHISPER_DEVICE,
         compute_type=WHISPER_COMPUTE_TYPE,
         cpu_threads=num_threads,
     )
-
-    if progress_callback:
-        progress_callback("transcribe", 41, f"Whisper speech engine loaded ({model_size}). Decoding speech segments...")
 
     segments_generator, info = model.transcribe(
         str(audio_path),
@@ -90,10 +86,9 @@ def transcribe_audio(
         })
 
         if progress_callback and info.duration and info.duration > 0:
-            progress_fraction = min(1.0, max(0.0, seg.end / info.duration))
-            pct = 41 + int(progress_fraction * 19)
+            pct = 40 + int((seg.end / info.duration) * 20)
             pct = min(60, pct)
-            preview = (clean_text[:40] + "...") if len(clean_text) > 40 else (clean_text or "...")
+            preview = (clean_text[:45] + "...") if len(clean_text) > 45 else (clean_text or "...")
             progress_callback(
                 "transcribe",
                 pct,

@@ -118,42 +118,6 @@ def get_all_pending_clips() -> List[Dict[str, str]]:
     return pending
 
 
-def log_pipeline_stage(
-    video_id: str,
-    stage: str,
-    status: str,
-    duration_sec: float,
-    details: str = "",
-    log_file: Path = LOG_FILE,
-):
-    """Log individual pipeline stage (download, transcribe, segment, render) to clipwise_log.csv."""
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    file_exists = log_file.exists()
-
-    headers = [
-        "timestamp",
-        "video_id",
-        "stage",
-        "status",
-        "duration_sec",
-        "details",
-    ]
-    row = {
-        "timestamp": datetime.now().isoformat(),
-        "video_id": video_id,
-        "stage": stage,
-        "status": status,
-        "duration_sec": f"{duration_sec:.2f}",
-        "details": details,
-    }
-
-    with open(log_file, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
-        if not file_exists:
-            writer.writeheader()
-        writer.writerow(row)
-
-
 def append_to_run_log(
     video_id: str,
     url: str,

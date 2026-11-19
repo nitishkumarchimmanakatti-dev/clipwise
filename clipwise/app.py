@@ -25,7 +25,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-import clipwise.config as config
 from clipwise.config import (
     OUTPUT_DIR,
     ORIGINALS_DIR,
@@ -179,16 +178,6 @@ async def serve_index():
         return HTMLResponse(f.read())
 
 
-@app.get("/api/config")
-async def get_app_config():
-    """Return runtime configuration for frontend UI features."""
-    return {
-        "enable_youtube": config.ENABLE_YOUTUBE_URL,
-        "max_upload_size_mb": MAX_UPLOAD_SIZE_MB,
-        "default_caption_color": DEFAULT_CAPTION_COLOR,
-    }
-
-
 # --- GENERATION & UPLOAD PIPELINE ---
 
 @app.post("/api/generate")
@@ -198,12 +187,6 @@ async def start_generation(
     _auth: None = Depends(require_auth),
 ):
     """Submit a YouTube URL for processing (requires ownership confirmation)."""
-    if not config.ENABLE_YOUTUBE_URL:
-        raise HTTPException(
-            status_code=403,
-            detail="YouTube URL processing is disabled on cloud deployment. Please use the Upload Video tab."
-        )
-
     if not (req.ownership_confirmed or req.rights_confirmed):
         raise HTTPException(
             status_code=400,
@@ -277,16 +260,9 @@ async def upload_and_process_video(
     mode: str = Form("blur"),
     use_llm: bool = Form(False),
     caption_color: str = Form(DEFAULT_CAPTION_COLOR),
-    rights_confirmed: bool = Form(False),
     _auth: None = Depends(require_auth),
 ):
-    """Upload a local video file (MP4/MOV) with max upload size and rights validation."""
-    if not rights_confirmed:
-        raise HTTPException(
-            status_code=400,
-            detail="Rights confirmation required: You must confirm rights to the video before processing."
-        )
-
+    """Upload a local video file (MP4/MOV) with max upload size validation."""
     try:
         ensure_ffmpeg()
         task_id = str(uuid.uuid4())

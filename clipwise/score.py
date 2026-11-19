@@ -26,6 +26,18 @@ PAYOFF_KEYWORDS = {
     "the reason", "solution", "here is why", "yeh raha", "samjhe", "conclusion"
 }
 
+# Strong story conclusion, moral, and takeaway indicators
+STORY_CONCLUSION_KEYWORDS = {
+    "finally", "in the end", "the result", "remember", "never forget",
+    "that is why", "that's why", "bottom line", "the truth is",
+    "now you know", "takeaway", "lesson", "subscribe", "follow for more",
+    "try this", "save this", "share this", "what do you think", "key is",
+    "moral", "solution", "conclusion", "answer", "proved", "outcome",
+    "aakhri mein", "ant mein", "asli baat", "yeh seekh", "yaad rakhna",
+    "isliye", "tab jakar", "to yeh tha", "hamesha yaad", "samjhe",
+    "fayda", "nateeja", "seekh lo"
+}
+
 
 def evaluate_hook_details(candidate: Dict[str, Any]) -> Dict[str, Any]:
     """Calculate detailed hook score and generate human-readable 'why_this_clip' note."""
@@ -37,7 +49,7 @@ def evaluate_hook_details(candidate: Dict[str, Any]) -> Dict[str, Any]:
         return {"score": 0.0, "why": "Empty transcript"}
 
     reasons: List[str] = []
-    score = 3.5  # Base score for coherent speech window
+    score = 4.0  # Base score for coherent speech window
 
     # 1. Analyze the Hook (first 5.5 seconds or first 15 words)
     hook_words = [w["word"] for w in words if (w["start"] - candidate["start"]) <= 5.5]
@@ -77,11 +89,30 @@ def evaluate_hook_details(candidate: Dict[str, Any]) -> Dict[str, Any]:
         score += min(len(all_hook_kw) * 1.2, 2.8)
         reasons.append(f"High-retention hook keywords: {', '.join(all_hook_kw[:3])}")
 
-    # 2. Payoff Detection (Resolution following early tension)
+    # 2. Story Arc & Narrative Completeness Evaluation
+    ending_sent = candidate.get("ending_sentence", "")
+    if not ending_sent:
+        sents = re.split(r"(?<=[.!?])\s+", text.strip())
+        ending_sent = sents[-1] if sents else text
+    ending_lower = ending_sent.lower()
+
     payoff_matches = [p for p in PAYOFF_KEYWORDS if p in full_lower]
-    if payoff_matches:
-        score += 1.2
-        reasons.append("Complete story arc with clear payoff/resolution")
+    has_conclusion_marker = any(ck in ending_lower for ck in STORY_CONCLUSION_KEYWORDS)
+    if has_conclusion_marker or payoff_matches:
+        score += 1.8
+        reasons.append("Complete story resolution with satisfying payoff/takeaway")
+
+    # Multi-beat narrative development (Hook -> Story -> Resolution)
+    sentence_count = candidate.get("sentence_count", len(re.split(r"(?<=[.!?])\s+", text.strip())))
+    if sentence_count >= 3:
+        score += 1.0
+        reasons.append(f"Multi-beat narrative structure ({sentence_count} sentences)")
+
+    # Penalize cliffhanger endings (ending on an open question without answer when duration > 25s)
+    if ending_sent.strip().endswith("?") and duration > 25.0:
+        if not any(cta in ending_lower for cta in ["what do you think", "did you know", "kaisa laga", "right?"]):
+            score -= 2.0
+            reasons.append("Cliffhanger ending without resolved answer")
 
     # 3. Speech Pace Dynamics (Words per Minute)
     word_count = len(words) if words else len(text.split())

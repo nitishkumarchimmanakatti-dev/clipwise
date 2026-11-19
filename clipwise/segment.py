@@ -20,11 +20,49 @@ DEPENDENT_PHRASES = [
     "in the last part", "jaise maine pehle kaha", "pichli video mein", "jaise pehle bataya"
 ]
 
+# Continuation words that signal an unfinished, dangling clause if placed at clip end
+UNRESOLVED_ENDINGS = {
+    "and", "or", "but", "so", "because", "like", "which", "that", "that's",
+    "to", "in", "of", "with", "if", "when", "while", "where", "since",
+    "although", "though", "even", "then", "also", "for", "as", "about",
+    "ki", "aur", "ya", "lekin", "magar", "par", "isliye", "kyun", "jaise",
+    "matlab", "agar", "jab", "tab", "toh", "ka", "ke", "ki", "ko", "se", "mein"
+}
+
 HOOK_WORDS = {
     "secret", "mistake", "truth", "why", "how", "stop", "never", "always",
     "proven", "crazy", "warning", "trick", "insane", "hack", "nobody", "shocking",
     "raaz", "galti", "sach", "kyun", "kaise", "asliyat", "dekho", "zaroori"
 }
+
+
+def is_valid_story_ending(sentence: Dict[str, Any]) -> bool:
+    """Ensure a sentence provides a complete, resolved thought and does not cut off mid-clause."""
+    words = sentence.get("words", [])
+    if not words:
+        return False
+
+    last_word_raw = words[-1].get("word", "").strip()
+    last_token = re.sub(r"[^\w]", "", last_word_raw).lower()
+
+    if last_token in UNRESOLVED_ENDINGS:
+        return False
+
+    if len(words) >= 2:
+        last_two = " ".join(re.sub(r"[^\w]", "", w["word"]).lower() for w in words[-2:])
+        if last_two in {"such as", "for example", "meaning that", "and then", "and also", "as well"}:
+            return False
+
+    if (
+        last_word_raw.endswith(",")
+        or last_word_raw.endswith(":")
+        or last_word_raw.endswith(";")
+        or last_word_raw.endswith("...")
+        or last_word_raw.endswith("—")
+    ):
+        return False
+
+    return True
 
 
 def score_sentence_hook_strength(sentence: Dict[str, Any]) -> float:
@@ -104,9 +142,20 @@ def extract_sentences(raw_segments: List[Dict[str, Any]]) -> List[Dict[str, Any]
             if gap > 0.75:
                 has_pause = True
 
-        ends_with_punct = any(word_text.endswith(p) for p in [".", "!", "?", "...", "—"])
+        ends_with_punct = any(word_text.endswith(p) for p in [".", "!", "?", "।"])
+        clean_token = re.sub(r"[^\w]", "", word_text).lower()
 
-        if ends_with_punct or has_pause or (i == len(all_words) - 1):
+        is_break = False
+        if ends_with_punct:
+            is_break = True
+        elif has_pause:
+            gap = all_words[i + 1]["start"] - w["end"]
+            if gap > 1.2 and clean_token not in UNRESOLVED_ENDINGS:
+                is_break = True
+        elif i == len(all_words) - 1:
+            is_break = True
+
+        if is_break:
             sent_start = current_words[0]["start"]
             sent_end = current_words[-1]["end"]
             sent_text = " ".join(cw["word"] for cw in current_words).strip()
@@ -130,7 +179,7 @@ def generate_candidate_segments(
     target_duration: float = TARGET_CLIP_DURATION,
 ) -> List[Dict[str, Any]]:
     """Extract candidate segments where the first 1-3 seconds form a hook and the ending
-    resolves on a clean sentence boundary with 0.3-0.5s padding.
+    resolves on a complete, self-contained story arc with 0.45s tail buffer.
     """
     raw_segments = transcript.get("segments", [])
     sentences = extract_sentences(raw_segments)
@@ -164,14 +213,24 @@ def generate_candidate_segments(
         for j in range(i, num_sentences):
             accumulated_words.extend(sentences[j]["words"])
             raw_end_time = sentences[j]["end"]
-            # Hold 0.35s tail silence after last word for a natural non-abrupt ending
-            padded_end_time = round(raw_end_time + 0.35, 3)
+            # Hold 0.45s tail silence after last word for a natural non-abrupt ending
+            padded_end_time = round(raw_end_time + 0.45, 3)
             duration = padded_end_time - start_time
 
             if duration > max_duration:
                 break
 
             if duration >= min_duration:
+                # Proper Story Ending Check: Reject dangling clauses and incomplete thoughts
+                if not is_valid_story_ending(sentences[j]):
+                    continue
+
+                sentence_count = (j - i + 1)
+                # If the opening sentence was an intriguing question, ensure the clip spans enough sentences
+                # to provide the full answer/story rather than cutting off as a cliffhanger
+                if "?" in start_sentence["text"] and sentence_count < 2 and duration < 20.0:
+                    continue
+
                 text_content = " ".join(w["word"] for w in accumulated_words).strip()
                 
                 # Check for context dependency penalties
@@ -183,8 +242,10 @@ def generate_candidate_segments(
                     "duration": round(duration, 2),
                     "text": text_content,
                     "words": list(accumulated_words),
-                    "sentence_count": (j - i + 1),
+                    "sentence_count": sentence_count,
                     "has_dependency": has_dep,
+                    "opening_sentence": start_sentence["text"],
+                    "ending_sentence": sentences[j]["text"],
                 })
 
     return candidates

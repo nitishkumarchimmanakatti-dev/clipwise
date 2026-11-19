@@ -68,3 +68,17 @@ def test_filter_overlapping_candidates():
     assert len(filtered) == 2
     assert filtered[0]["start"] == 0.0
     assert filtered[1]["start"] == 60.0
+
+
+def test_proper_story_endings_and_unresolved_clause_rejection():
+    from clipwise.segment import is_valid_story_ending
+    # Valid resolved endings
+    assert is_valid_story_ending({"words": [{"word": "This"}, {"word": "is"}, {"word": "the"}, {"word": "truth."}]})
+    assert is_valid_story_ending({"words": [{"word": "Remember"}, {"word": "this"}, {"word": "forever!"}]})
+
+    # Unresolved trailing clauses (must be rejected)
+    assert not is_valid_story_ending({"words": [{"word": "And"}, {"word": "that"}, {"word": "happened"}, {"word": "because"}]})
+    assert not is_valid_story_ending({"words": [{"word": "Here"}, {"word": "is"}, {"word": "another"}, {"word": "example,"}]})
+    assert not is_valid_story_ending({"words": [{"word": "We"}, {"word": "need"}, {"word": "to"}, {"word": "and"}]})
+    assert not is_valid_story_ending({"words": [{"word": "Such"}, {"word": "as"}]})
+    assert not is_valid_story_ending({"words": [{"word": "Trailer..."}, {"word": "wait..."}]})
