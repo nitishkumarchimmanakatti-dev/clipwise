@@ -24,9 +24,11 @@ def test_youtube_status_unconfigured(monkeypatch, tmp_path):
     monkeypatch.delenv("YOUTUBE_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("YOUTUBE_REFRESH_TOKEN", raising=False)
 
-    status = check_channel_auth_status()
-    assert isinstance(status, dict)
-    assert status.get("authenticated") is False
+    with patch("clipwise.youtube_upload._get_token_file_path", return_value=tmp_path / "no_token.json"):
+        with patch("clipwise.youtube_upload._get_client_secret_path", return_value=None):
+            status = check_channel_auth_status()
+            assert isinstance(status, dict)
+            assert status.get("authenticated") is False
 
 
 def test_upload_clip_missing_file():
@@ -94,3 +96,29 @@ def test_api_youtube_upload_missing_clip(client):
         "title": "Test Title"
     })
     assert res.status_code == 404
+
+
+def test_upload_limit_exceeded_error_message(tmp_path):
+    from googleapiclient.errors import HttpError
+    from unittest.mock import MagicMock
+
+    fake_video = tmp_path / "clip_02.mp4"
+    fake_video.write_bytes(b"dummy mp4 video bytes")
+
+    mock_resp = MagicMock(status=400, reason="Bad Request")
+    content = b'{"error": {"errors": [{"reason": "uploadLimitExceeded", "message": "The user has exceeded the number of videos they may upload."}]}}'
+    http_err = HttpError(resp=mock_resp, content=content)
+
+    mock_service = MagicMock()
+    mock_insert = MagicMock()
+    mock_insert.next_chunk.side_effect = http_err
+    mock_service.videos().insert.return_value = mock_insert
+
+    with patch("clipwise.youtube_upload.get_youtube_service", return_value=mock_service):
+        with pytest.raises(RuntimeError) as exc_info:
+            upload_clip_to_youtube(
+                video_path=fake_video,
+                title="Test Short",
+                description="Test Desc",
+            )
+        assert "YouTube Daily Upload Limit Reached" in str(exc_info.value)

@@ -362,6 +362,9 @@ def main():
     ui_parser.add_argument("--host", type=str, default="127.0.0.1", help="Host interface")
     ui_parser.add_argument("--port", type=int, default=8000, help="Port to run web app")
 
+    # Command: connect-youtube
+    subparsers.add_parser("connect-youtube", help="One-click browser login to authorize YouTube channel")
+
     args = parser.parse_args()
 
     # Startup checks
@@ -404,6 +407,10 @@ def main():
     elif args.command == "ui":
         from clipwise.app import start_server
         start_server(host=args.host, port=args.port)
+
+    elif args.command == "connect-youtube":
+        from clipwise.youtube_upload import run_browser_oauth
+        run_browser_oauth()
 
     else:
         parser.print_help()

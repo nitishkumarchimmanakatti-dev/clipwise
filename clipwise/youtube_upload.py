@@ -243,6 +243,29 @@ def save_client_secret_file(content: str) -> Path:
     return target_path
 
 
+def run_browser_oauth(port: int = 8080) -> Dict[str, Any]:
+    """Launch local webserver and open browser for one-click Google OAuth sign-in."""
+    if not GOOGLE_LIBS_AVAILABLE:
+        raise RuntimeError("Google API client libraries are not installed.")
+
+    secret_path = _get_client_secret_path()
+    if not secret_path:
+        raise FileNotFoundError("client_secret.json not found.")
+
+    flow = InstalledAppFlow.from_client_secrets_file(
+        str(secret_path),
+        scopes=YOUTUBE_SCOPES,
+    )
+    creds = flow.run_local_server(port=port, prompt="consent")
+    token_path = _get_token_file_path()
+    with open(token_path, "w", encoding="utf-8") as f:
+        f.write(creds.to_json())
+
+    print(f"\n🎉 YouTube Channel successfully authenticated!")
+    print(f"Token saved to: {token_path}")
+    return {"authenticated": True, "token_path": str(token_path)}
+
+
 def upload_clip_to_youtube(
     video_path: Path,
     title: str,
@@ -313,9 +336,32 @@ def upload_clip_to_youtube(
         media_body=media,
     )
 
-    response = None
-    while response is None:
-        status, response = request.next_chunk()
+    try:
+        response = None
+        while response is None:
+            status, response = request.next_chunk()
+    except HttpError as err:
+        err_str = str(err)
+        if hasattr(err, "content") and err.content:
+            raw_content = err.content.decode("utf-8", errors="ignore") if isinstance(err.content, bytes) else str(err.content)
+            err_str += " " + raw_content
+
+        if "uploadLimitExceeded" in err_str:
+            raise RuntimeError(
+                "YouTube Daily Upload Limit Reached for this channel!\n\n"
+                "New or unverified YouTube channels are capped at 1 to 5 uploads every 24 hours.\n\n"
+                "👉 How to unlock unlimited uploads immediately:\n"
+                "1. Go to YouTube Studio (studio.youtube.com)\n"
+                "2. Click Settings ⚙️ → Channel → Feature eligibility\n"
+                "3. Enable 'Intermediate features' by verifying your phone number.\n\n"
+                "Otherwise, YouTube will reset your daily quota in 24 hours."
+            ) from err
+        if "quotaExceeded" in err_str:
+            raise RuntimeError(
+                "Google Cloud YouTube API daily quota exceeded (10,000 units/day). "
+                "This quota resets automatically at midnight Pacific Time."
+            ) from err
+        raise
 
     video_id = response.get("id")
     shorts_url = f"https://youtube.com/shorts/{video_id}"
