@@ -61,7 +61,10 @@ def run_pipeline(
         if progress_callback:
             progress_callback(step, percent, message)
         else:
-            print(f"[{percent:3d}%] [{step.upper()}] {message}")
+            try:
+                print(f"[{percent:3d}%] [{step.upper()}] {message}")
+            except OSError:
+                pass
 
     notify("validate", 5, f"Validating YouTube URL: {url}")
     video_id = validate_youtube_url(url, ownership_confirmed=ownership_confirmed)
@@ -191,7 +194,10 @@ def run_pipeline_for_file(
         if progress_callback:
             progress_callback(step, percent, message)
         else:
-            print(f"[{percent:3d}%] [{step.upper()}] {message}")
+            try:
+                print(f"[{percent:3d}%] [{step.upper()}] {message}")
+            except OSError:
+                pass
 
     import hashlib
     video_id = hashlib.md5(video_file_path.name.encode()).hexdigest()[:11]

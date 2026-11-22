@@ -119,8 +119,9 @@ def download_video(
         },
         "js_runtimes": {"node": {}},
         "remote_components": {"ejs:github"},
-        "quiet": False,
-        "no_warnings": False,
+        "quiet": True,
+        "no_warnings": True,
+        "noprogress": True,
         "postprocessors": [
             {
                 "key": "FFmpegVideoConvertor",
