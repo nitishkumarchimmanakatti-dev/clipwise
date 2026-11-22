@@ -125,3 +125,34 @@ def test_metadata_sequential_parts():
     assert "Part 1 |" in meta["title"]
     assert "Part 1 of 3" in meta["description"]
     assert "Watch Part 2 next" in meta["description"]
+
+
+def test_score_candidates_start_to_climax_distribution():
+    """Verify that candidate selection samples the starting hook, middle, and climax ending."""
+    candidates = [
+        # Start of video (0s - 100s)
+        {"start": 10.0, "end": 35.0, "duration": 25.0, "text": "Did you know this hidden fact about the future?", "words": []},
+        {"start": 40.0, "end": 65.0, "duration": 25.0, "text": "Here is why everyone gets this wrong.", "words": []},
+        # Clustered middle (400s - 600s) with strong hooks
+        {"start": 400.0, "end": 425.0, "duration": 25.0, "text": "Stop doing this mistake 100% of the time!", "words": []},
+        {"start": 430.0, "end": 455.0, "duration": 25.0, "text": "Why do people ignore this crazy secret?", "words": []},
+        {"start": 460.0, "end": 485.0, "duration": 25.0, "text": "Number three rule of building wealth.", "words": []},
+        {"start": 500.0, "end": 525.0, "duration": 25.0, "text": "Never give up on your biggest dream!", "words": []},
+        # Climax and ending of video (900s - 1000s)
+        {"start": 920.0, "end": 945.0, "duration": 25.0, "text": "Finally, the ultimate conclusion that changes everything.", "words": []},
+        {"start": 950.0, "end": 975.0, "duration": 25.0, "text": "In the end, this is the final takeaway to remember.", "words": []},
+    ]
+
+    scored = score_candidates(candidates, top_n=3)
+    assert len(scored) == 3
+    # First clip MUST be from the start of the video
+    assert scored[0]["start"] <= 100.0
+    # Middle clip MUST be from the middle
+    assert 300.0 <= scored[1]["start"] <= 700.0
+    # Final clip MUST be from the ending climax
+    assert scored[2]["start"] >= 900.0
+
+    # Must be sequential Part 1, 2, 3
+    assert scored[0]["part_number"] == 1
+    assert scored[1]["part_number"] == 2
+    assert scored[2]["part_number"] == 3

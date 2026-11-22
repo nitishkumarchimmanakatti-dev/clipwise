@@ -229,7 +229,13 @@ def score_candidates(
     use_llm: bool = False,
     top_n: int = 10,
 ) -> List[Dict[str, Any]]:
-    """Score, rank, and select the top candidate segments with metadata rationales."""
+    """Score, rank, and select candidate segments distributed across the entire video timeline.
+
+    Guarantees:
+    1. Full Timeline Coverage: Extracts the best clips from the starting hook all the way to the final climax/ending.
+    2. Strict Zero Overlap: Every clip is completely unique with 0.0s overlap.
+    3. Chronological Narrative Sequence: Clips are arranged sequentially (Part 1 to Part N).
+    """
     if not candidates:
         return []
 
@@ -238,27 +244,65 @@ def score_candidates(
         cand["hook_score"] = details["score"]
         cand["why_this_clip"] = details["why"]
 
-    # Sort descending by hook score
-    candidates.sort(key=lambda c: c["hook_score"], reverse=True)
+    # If only 1 clip requested or 1 candidate available, pick the highest hook score
+    if top_n <= 1 or len(candidates) <= 1:
+        best = max(candidates, key=lambda c: c["hook_score"])
+        best["part_number"] = 1
+        best["total_parts"] = 1
+        return [best]
 
-    # De-duplicate candidate windows: strictly non-overlapping (0.0s overlap)
+    # Timeline span across candidates
+    t_min = min(c["start"] for c in candidates)
+    t_max = max(c["end"] for c in candidates)
+    timeline_span = t_max - t_min
+
+    # Sort candidates descending by hook score
+    candidates_by_score = sorted(candidates, key=lambda c: c["hook_score"], reverse=True)
+
     selected: List[Dict[str, Any]] = []
-    for cand in candidates:
-        overlaps = False
-        for s in selected:
-            intersection = max(0.0, min(cand["end"], s["end"]) - max(cand["start"], s["start"]))
-            if intersection > 0.0:
-                overlaps = True
-                break
-        if not overlaps:
-            selected.append(cand)
-        if len(selected) >= top_n:
-            break
+
+    def is_overlapping(cand: Dict[str, Any], current_list: List[Dict[str, Any]]) -> bool:
+        for s in current_list:
+            inter = max(0.0, min(cand["end"], s["end"]) - max(cand["start"], s["start"]))
+            if inter > 0.0:
+                return True
+        return False
+
+    if timeline_span > 0:
+        # Divide video timeline into top_n chronological buckets
+        # Bucket 0: Start of video (opening hook)
+        # Buckets 1..N-2: Middle progressive story arcs
+        # Bucket N-1: Climax, ending conclusion, and final takeaway
+        bucket_size = timeline_span / top_n
+        buckets: List[List[Dict[str, Any]]] = [[] for _ in range(top_n)]
+
+        for cand in candidates_by_score:
+            mid = (cand["start"] + cand["end"]) / 2.0
+            b_idx = int((mid - t_min) / bucket_size)
+            b_idx = min(max(b_idx, 0), top_n - 1)
+            buckets[b_idx].append(cand)
+
+        # Primary Pass: Select the best non-overlapping candidate from each bucket (0 to top_n - 1)
+        # This guarantees representation from the start, progressive middle chapters, and final climax
+        for b_idx in range(top_n):
+            for cand in buckets[b_idx]:
+                if not is_overlapping(cand, selected):
+                    selected.append(cand)
+                    break
+
+    # Secondary Pass: If any bucket was empty or conflicted, fill remaining slots
+    # with the highest-scoring non-overlapping candidates across the video
+    if len(selected) < top_n:
+        for cand in candidates_by_score:
+            if cand not in selected and not is_overlapping(cand, selected):
+                selected.append(cand)
+                if len(selected) >= top_n:
+                    break
 
     if use_llm:
         selected = score_candidates_with_llm(selected, top_n=top_n)
 
-    # Sort selected candidates chronologically so clips form a coherent sequential series
+    # Sort selected candidates chronologically so clips form a coherent sequential series from start to climax
     selected.sort(key=lambda c: c["start"])
 
     # Number the parts sequentially
