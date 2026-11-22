@@ -241,14 +241,13 @@ def score_candidates(
     # Sort descending by hook score
     candidates.sort(key=lambda c: c["hook_score"], reverse=True)
 
-    # De-duplicate heavily overlapping candidate windows (>70% overlap)
+    # De-duplicate candidate windows: strictly non-overlapping (0.0s overlap)
     selected: List[Dict[str, Any]] = []
     for cand in candidates:
         overlaps = False
         for s in selected:
             intersection = max(0.0, min(cand["end"], s["end"]) - max(cand["start"], s["start"]))
-            smaller_dur = min(cand["duration"], s["duration"])
-            if smaller_dur > 0 and (intersection / smaller_dur) > 0.65:
+            if intersection > 0.0:
                 overlaps = True
                 break
         if not overlaps:
@@ -258,5 +257,14 @@ def score_candidates(
 
     if use_llm:
         selected = score_candidates_with_llm(selected, top_n=top_n)
+
+    # Sort selected candidates chronologically so clips form a coherent sequential series
+    selected.sort(key=lambda c: c["start"])
+
+    # Number the parts sequentially
+    total_parts = len(selected)
+    for idx, cand in enumerate(selected, start=1):
+        cand["part_number"] = idx
+        cand["total_parts"] = total_parts
 
     return selected

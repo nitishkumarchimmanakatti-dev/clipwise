@@ -24,7 +24,11 @@ MOOD_KEYWORDS = {
     "motivational": [
         "never give up", "jeetenge", "himmat", "fail", "failure", "winner",
         "success", "discipline", "focus", "dream", "hustle", "work hard",
-        "power", "grind", "possible", "strength", "believe", "champions", "lead"
+        "power", "grind", "possible", "strength", "believe", "champions", "lead",
+        "attitude", "podcast", "mindset", "money", "wealth", "billionaire", "rich",
+        "future", "elon", "ai", "tech", "build", "rules", "goal", "drive", "energy",
+        "strategy", "win", "alpha", "sigma", "mentality", "warrior", "advice",
+        "motivation", "motivational", "inspire", "hard work", "consistency", "leader"
     ],
     "romantic": [
         "love", "pyaar", "dil", "ishq", "mohabbat", "relationship", "partner",

@@ -73,7 +73,15 @@ def create_clip_metadata(
     duration = candidate["duration"]
     hook_score = candidate.get("hook_score", 5.0)
 
-    title = generate_clip_title(candidate["text"])
+    part_num = candidate.get("part_number")
+    total_parts = candidate.get("total_parts")
+
+    if part_num:
+        raw_title = generate_clip_title(candidate["text"], max_chars=55)
+        title = f"Part {part_num} | {raw_title}"
+    else:
+        title = generate_clip_title(candidate["text"])
+
     hashtags = generate_hashtags(candidate["text"])
 
     source_title = source_metadata.get("title", "Source Video")
@@ -84,8 +92,17 @@ def create_clip_metadata(
     start_str = f"{int(start_sec // 60):02d}:{int(start_sec % 60):02d}"
     end_str = f"{int(end_sec // 60):02d}:{int(end_sec % 60):02d}"
 
+    seq_prefix = f"Part {part_num} of {total_parts}\n" if (part_num and total_parts) else ""
+    seq_note = (
+        f"Follow the series in order! Watch Part {(part_num % total_parts) + 1} next.\n\n"
+        if (part_num and total_parts and total_parts > 1)
+        else ""
+    )
+
     description = (
         f"{title}\n\n"
+        f"{seq_prefix}"
+        f"{seq_note}"
         f"Clip from '{source_title}' by {channel_name} ({start_str} - {end_str}).\n"
         f"Full video: {source_url}\n\n"
         f"{' '.join(hashtags)}"
@@ -94,6 +111,8 @@ def create_clip_metadata(
     metadata = {
         "clip_id": clip_id,
         "title": title,
+        "part_number": part_num,
+        "total_parts": total_parts,
         "description": description,
         "hashtags": hashtags,
         "start": start_sec,

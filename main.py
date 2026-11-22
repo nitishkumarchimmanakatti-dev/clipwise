@@ -117,8 +117,11 @@ def run_pipeline(
         clip_srt = video_output_dir / f"{clip_id}.srt"
         clip_meta_file = video_output_dir / f"{clip_id}_metadata.json"
 
-        # Detect situational background music
+        # Detect situational background music (always ensure engaging background music)
         mood, music_reason = detect_clip_mood(cand)
+        if not mood:
+            mood = "motivational"
+            music_reason = "Motivational/Attitude: energetic driving background beat for high retention"
         cand["mood"] = mood
         cand["music_reason"] = music_reason
         music_track = get_track_for_mood(mood)
@@ -264,8 +267,11 @@ def run_pipeline_for_file(
         clip_srt = video_output_dir / f"{clip_id}.srt"
         clip_meta_file = video_output_dir / f"{clip_id}_metadata.json"
 
-        # Detect situational background music
+        # Detect situational background music (always ensure engaging background music)
         mood, music_reason = detect_clip_mood(cand)
+        if not mood:
+            mood = "motivational"
+            music_reason = "Motivational/Attitude: energetic driving background beat for high retention"
         cand["mood"] = mood
         cand["music_reason"] = music_reason
         music_track = get_track_for_mood(mood)
