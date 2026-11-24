@@ -114,7 +114,7 @@ def download_video(
         "concurrent_fragment_downloads": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios"],
+                "player_client": ["android", "ios", "tv", "mweb", "web_creator"],
             }
         },
         "js_runtimes": {"node": {}},
@@ -164,9 +164,8 @@ def download_video(
                     "Please use a completed video or wait until this stream ends."
                 )
 
-            # Smart speed optimization: If video is over 15 minutes, download only the first 15 mins (900s)
-            # This prevents 30-minute gigabyte download freezes while still providing plenty of footage for viral shorts
-            MAX_SEC = 900
+            # Allow full duration analysis (up to 2 hours) so clips can reach the final climax
+            MAX_SEC = 7200
             if info_check.get("duration") and info_check["duration"] > MAX_SEC:
                 from yt_dlp.utils import download_range_func
                 ydl.params["download_ranges"] = download_range_func(None, [(0, MAX_SEC)])
