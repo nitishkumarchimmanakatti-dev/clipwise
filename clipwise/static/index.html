@@ -105,19 +105,26 @@
               </div>
             </div>
 
-            <!-- User Prompt & Range Guidance Input Bar -->
+            <!-- User Prompt & Range Guidance Input Bar (Spacious Box for Full Visibility) -->
             <div class="prompt-bar-group">
               <div class="prompt-bar-label">
                 <span class="prompt-badge">🎯 AI Clipping Prompt & Range (Optional)</span>
-                <span class="prompt-desc">Specify where to clip (e.g. <code>15:00 to 45:00</code>) and what topics the clips should relate to</span>
+                <span class="prompt-desc">Specify where to clip (e.g. <code>10:00 to 25:00</code> or <code>5 to 10 mins</code>) and what topics clips must focus on</span>
               </div>
-              <div class="prompt-input-wrapper">
+              <div class="prompt-input-wrapper prompt-textarea-wrapper">
                 <span class="prompt-input-icon">✨</span>
-                <input 
-                  type="text" 
+                <textarea 
                   id="customPrompt" 
-                  placeholder="e.g. From 15:00 to 45:00, extract clips about Elon's mindset, Tesla Optimus, and work ethic advice" 
-                />
+                  rows="3"
+                  placeholder="Type your exact instructions here... e.g. 'From 10:00 to 18:00, extract clips focused on Elon's advice about hard work, failure, and building the future'"
+                ></textarea>
+              </div>
+              <div class="prompt-quick-pills">
+                <span class="quick-pill-label">Quick suggestions:</span>
+                <button type="button" class="quick-pill" data-text="From 5 to 10 minutes, high energy highlights">⏱️ 5 to 10 mins</button>
+                <button type="button" class="quick-pill" data-text="From 10:00 to 25:00, core discussion and insights">⏱️ 10:00 to 25:00</button>
+                <button type="button" class="quick-pill" data-text="Extract the final climax and concluding takeaway">🎯 Climax & Ending</button>
+                <button type="button" class="quick-pill" data-text="Focus on motivational mindset and hard work advice">💡 Motivational Advice</button>
               </div>
             </div>
 

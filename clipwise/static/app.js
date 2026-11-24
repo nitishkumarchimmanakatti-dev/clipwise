@@ -131,6 +131,22 @@ document.addEventListener('DOMContentLoaded', () => {
     youtubeUrl.setAttribute('required', 'true');
   });
 
+  // Quick Prompt Suggestion Pills
+  const quickPills = document.querySelectorAll('.quick-pill');
+  quickPills.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.text;
+      if (customPrompt) {
+        if (!customPrompt.value.trim()) {
+          customPrompt.value = text;
+        } else {
+          customPrompt.value += `, ${text}`;
+        }
+        customPrompt.focus();
+      }
+    });
+  });
+
   // Stopwatch Timer
   function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
@@ -380,7 +396,13 @@ document.addEventListener('DOMContentLoaded', () => {
           stopTimer();
           resetSubmitBtns();
           progressSection.classList.add('hidden');
-          loadClipsForVideo(videoId);
+          if (task.clips && task.clips.length > 0) {
+            renderClipsGrid(task.clips);
+            resultsSection.classList.remove('hidden');
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            loadClipsForVideo(videoId);
+          }
         } else if (task.status === 'failed' || task.status === 'cancelled') {
           clearInterval(pollInterval);
           stopTimer();

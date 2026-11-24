@@ -439,25 +439,40 @@ async def get_clips_for_video(video_id: str):
     review_rows = load_review_sheet(vdir)
     status_map = {r["clip_id"]: r["status"] for r in review_rows}
 
+    # Find the latest render version in output folder
+    all_meta_files = list(vdir.glob("*_metadata.json"))
+    latest_ver = 1
+    for mf in all_meta_files:
+        v_match = re.search(r"_v(\d+)_", mf.name)
+        if v_match:
+            latest_ver = max(latest_ver, int(v_match.group(1)))
+
     clips = []
-    meta_files = sorted(vdir.glob("*_metadata.json"))
-    for mf in meta_files:
+    for mf in sorted(all_meta_files):
+        is_versioned = bool(re.search(r"_v\d+_", mf.name))
+        is_latest_ver = f"_v{latest_ver}_" in mf.name
         try:
             with open(mf, "r", encoding="utf-8") as f:
                 cdata = json.load(f)
-                cid = cdata["clip_id"]
-                if cdata.get("youtube_status") == "uploaded":
-                    cdata["status"] = "uploaded"
-                else:
-                    cdata["status"] = status_map.get(cid, "pending")
-                cdata["video_url"] = f"/media/video/{video_id}/{cid}.mp4"
-                cdata["srt_url"] = f"/media/download/{video_id}/{cid}.srt"
-                cdata["download_url"] = f"/media/download/{video_id}/{cid}.mp4"
-                clips.append(cdata)
+            cid = cdata["clip_id"]
+            is_uploaded = cdata.get("youtube_status") == "uploaded"
+
+            # Only include latest version clips or clips already uploaded to YouTube
+            if is_versioned and not is_latest_ver and not is_uploaded:
+                continue
+
+            if is_uploaded:
+                cdata["status"] = "uploaded"
+            else:
+                cdata["status"] = status_map.get(cid, "pending")
+            cdata["video_url"] = f"/media/video/{video_id}/{cid}.mp4"
+            cdata["srt_url"] = f"/media/download/{video_id}/{cid}.srt"
+            cdata["download_url"] = f"/media/download/{video_id}/{cid}.mp4"
+            clips.append(cdata)
         except Exception:
             continue
 
-    return {"video_id": video_id, "clips": clips}
+    return {"video_id": video_id, "version": latest_ver, "clips": clips}
 
 
 @app.post("/api/clips/{clip_id}/status")
