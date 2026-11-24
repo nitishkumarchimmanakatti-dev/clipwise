@@ -5,6 +5,8 @@ import os
 import json
 from typing import List, Dict, Any, Optional
 
+from clipwise.prompt_filter import filter_and_boost_candidates_by_prompt
+
 # High-impact hook keywords in English and Hindi/Hinglish
 HOOK_KEYWORDS_EN = {
     "secret", "secrets", "never", "always", "mistake", "mistakes", "truth",
@@ -173,6 +175,7 @@ def calculate_rule_based_hook_score(candidate: Dict[str, Any]) -> float:
 def score_candidates_with_llm(
     candidates: List[Dict[str, Any]],
     top_n: int = 10,
+    user_prompt: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Optional LLM enrichment for hook scoring and viral rationale (Gemini / OpenAI)."""
     gemini_key = os.getenv("GEMINI_API_KEY")
@@ -192,10 +195,14 @@ def score_candidates_with_llm(
                 "rule_score": c.get("hook_score", 5.0),
             })
 
+        user_guidance = ""
+        if user_prompt and user_prompt.strip():
+            user_guidance = f"\nUSER GUIDANCE & FOCUS:\n'{user_prompt.strip()}'. Strongly prioritize and rate clips higher if they match this focus!\n"
+
         prompt = (
             "You are an expert viral YouTube Shorts editor. Rate the following clip excerpts "
             "from 1.0 to 10.0 based on: 1) Hook strength in first 3 seconds, 2) Standalone clarity, "
-            "and 3) Payoff satisfaction. Return a JSON object formatted as: "
+            f"and 3) Payoff satisfaction.{user_guidance} Return a JSON object formatted as: "
             '{"ratings": [{"index": 0, "score": 8.5, "why": "Captivating question hook with clear takeaway"}]}.\n\n'
             f"Excerpts:\n{json.dumps(excerpts)}"
         )
@@ -228,13 +235,15 @@ def score_candidates(
     candidates: List[Dict[str, Any]],
     use_llm: bool = False,
     top_n: int = 10,
+    prompt: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Score, rank, and select candidate segments distributed across the entire video timeline.
 
     Guarantees:
-    1. Full Timeline Coverage: Extracts the best clips from the starting hook all the way to the final climax/ending.
-    2. Strict Zero Overlap: Every clip is completely unique with 0.0s overlap.
-    3. Chronological Narrative Sequence: Clips are arranged sequentially (Part 1 to Part N).
+    1. User Prompt Guidance: If specified, focuses on user time range (e.g. 15:00 to 45:00) and topics.
+    2. Full Timeline Coverage: Extracts the best clips from the starting hook all the way to the final climax/ending.
+    3. Strict Zero Overlap: Every clip is completely unique with 0.0s overlap.
+    4. Chronological Narrative Sequence: Clips are arranged sequentially (Part 1 to Part N).
     """
     if not candidates:
         return []
@@ -243,6 +252,10 @@ def score_candidates(
         details = evaluate_hook_details(cand)
         cand["hook_score"] = details["score"]
         cand["why_this_clip"] = details["why"]
+
+    # Apply user prompt filtering (time range window & topic boosting)
+    if prompt and prompt.strip():
+        candidates = filter_and_boost_candidates_by_prompt(candidates, prompt, top_n=top_n)
 
     # If only 1 clip requested or 1 candidate available, pick the highest hook score
     if top_n <= 1 or len(candidates) <= 1:
@@ -300,7 +313,7 @@ def score_candidates(
                     break
 
     if use_llm:
-        selected = score_candidates_with_llm(selected, top_n=top_n)
+        selected = score_candidates_with_llm(selected, top_n=top_n, user_prompt=prompt)
 
     # Sort selected candidates chronologically so clips form a coherent sequential series from start to climax
     selected.sort(key=lambda c: c["start"])

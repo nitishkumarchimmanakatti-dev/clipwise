@@ -122,3 +122,30 @@ def test_upload_limit_exceeded_error_message(tmp_path):
                 description="Test Desc",
             )
         assert "YouTube Daily Upload Limit Reached" in str(exc_info.value)
+
+
+def test_api_youtube_uploaded_endpoint(client, tmp_path, monkeypatch):
+    import json
+    out_dir = tmp_path / "outputs"
+    vdir = out_dir / "vid123"
+    vdir.mkdir(parents=True, exist_ok=True)
+
+    meta_file = vdir / "vid123_clip_01_metadata.json"
+    meta_file.write_text(json.dumps({
+        "clip_id": "vid123_clip_01",
+        "title": "Uploaded Short Part 1",
+        "youtube_status": "uploaded",
+        "youtube_url": "https://youtube.com/shorts/testxyz123",
+        "youtube_video_id": "testxyz123",
+        "youtube_uploaded_at": "2026-11-24T12:00:00",
+    }), encoding="utf-8")
+
+    monkeypatch.setattr("clipwise.app.OUTPUT_DIR", out_dir)
+
+    res = client.get("/api/youtube/uploaded")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["count"] == 1
+    assert data["uploaded_clips"][0]["clip_id"] == "vid123_clip_01"
+    assert data["uploaded_clips"][0]["youtube_url"] == "https://youtube.com/shorts/testxyz123"
+

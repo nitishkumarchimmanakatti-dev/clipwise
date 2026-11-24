@@ -93,6 +93,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const storageMetrics = document.getElementById('storageMetrics');
   const triggerCleanupBtn = document.getElementById('triggerCleanupBtn');
 
+  // User Clipping Guidance Prompt & Uploaded Videos Dashboard
+  const customPrompt = document.getElementById('customPrompt');
+  const uploadedClipsGrid = document.getElementById('uploadedClipsGrid');
+  const candidatesCountBadge = document.getElementById('candidatesCountBadge');
+  const uploadedColCountBadge = document.getElementById('uploadedColCountBadge');
+  const uploadedCountBadge = document.getElementById('uploadedCountBadge');
+  const viewUploadedBtn = document.getElementById('viewUploadedBtn');
+  const uploadedModal = document.getElementById('uploadedModal');
+  const closeUploadedModalBtn = document.getElementById('closeUploadedModalBtn');
+  const allUploadedGrid = document.getElementById('allUploadedGrid');
+
   let currentVideoId = null;
   let currentActiveClip = null;
   let activeTaskId = null;
@@ -251,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ownership_confirmed: true,
           caption_color: captionColorSelect.value,
           force: true,
+          prompt: customPrompt ? customPrompt.value.trim() : null,
         }),
       });
 
@@ -312,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('mode', renderMode.value);
     formData.append('use_llm', useLlm.checked ? 'true' : 'false');
     formData.append('caption_color', captionColorSelect.value);
+    formData.append('prompt', customPrompt ? customPrompt.value.trim() : '');
 
     try {
       const res = await fetch('/api/upload', {
@@ -416,43 +429,127 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function createClipCard(clip, isUploaded) {
+    const card = document.createElement('div');
+    card.className = `clip-card ${isUploaded ? 'uploaded-card' : ''}`;
+    card.dataset.status = isUploaded ? 'uploaded' : (clip.status || 'pending');
+
+    const musicTag = clip.music_used ? `🎵 ${clip.music_track || 'Music'}` : 'No Music';
+    const score = clip.hook_score !== undefined ? clip.hook_score : 8.5;
+
+    const uploadedCta = isUploaded && clip.youtube_url ? `
+      <div style="margin-top: 10px;">
+        <a href="${clip.youtube_url}" target="_blank" class="youtube-live-badge" onclick="event.stopPropagation();">
+          ▶ Watch on YouTube Shorts ↗
+        </a>
+      </div>
+    ` : '';
+
+    const statusLabel = isUploaded ? '🚀 UPLOADED' : (clip.status || 'pending').toUpperCase();
+    const statusClass = isUploaded ? 'uploaded' : (clip.status || 'pending');
+
+    card.innerHTML = `
+      <div class="video-container">
+        <video src="${clip.video_url}" preload="metadata" muted playsinline></video>
+        <div class="card-overlay">
+          <span class="hook-score-badge">★ ${score}</span>
+          <span class="duration-badge">${Math.round(clip.duration)}s</span>
+        </div>
+        <div class="play-hint-icon">▶</div>
+      </div>
+      <div class="card-content">
+        <div class="card-meta">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+          <span class="music-pill">${musicTag}</span>
+        </div>
+        <h4 class="clip-title">${escapeHtml(clip.title)}</h4>
+        <p class="clip-why">${escapeHtml(clip.why_this_clip || 'High engagement hook')}</p>
+        ${uploadedCta}
+      </div>
+    `;
+
+    card.addEventListener('click', () => openReviewModal(clip));
+    return card;
+  }
+
   function renderClipsGrid(clips) {
     clipsGrid.innerHTML = '';
+    if (uploadedClipsGrid) uploadedClipsGrid.innerHTML = '';
 
-    if (clips.length === 0) {
-      clipsGrid.innerHTML = '<div class="empty-state">No clips found for this video.</div>';
-      return;
+    const candidates = clips.filter(c => c.status !== 'uploaded' && !c.youtube_url);
+    const uploaded = clips.filter(c => c.status === 'uploaded' || c.youtube_url);
+
+    if (candidatesCountBadge) candidatesCountBadge.textContent = candidates.length;
+    if (uploadedColCountBadge) uploadedColCountBadge.textContent = uploaded.length;
+
+    // 1. Render Candidates Column
+    if (candidates.length === 0) {
+      clipsGrid.innerHTML = '<div class="empty-column-state"><div class="empty-icon">⚡</div><p>No pending candidates</p><span>All generated clips have been approved or uploaded!</span></div>';
+    } else {
+      candidates.forEach(clip => {
+        clipsGrid.appendChild(createClipCard(clip, false));
+      });
     }
 
-    clips.forEach(clip => {
-      const card = document.createElement('div');
-      card.className = 'clip-card';
-      card.dataset.status = clip.status || 'pending';
+    // 2. Render Uploaded Videos Column
+    if (uploadedClipsGrid) {
+      if (uploaded.length === 0) {
+        uploadedClipsGrid.innerHTML = `
+          <div class="empty-column-state">
+            <div class="empty-icon">📺</div>
+            <p>No videos uploaded to YouTube yet from this batch.</p>
+            <span>Click "Approve & Upload" in any clip's review modal to publish it straight to your YouTube channel!</span>
+          </div>`;
+      } else {
+        uploaded.forEach(clip => {
+          uploadedClipsGrid.appendChild(createClipCard(clip, true));
+        });
+      }
+    }
 
-      const musicTag = clip.music_used ? `🎵 ${clip.music_track || 'Music'}` : 'No Music';
-      const score = clip.hook_score !== undefined ? clip.hook_score : 8.5;
+    updateUploadedCountBadge();
+  }
 
-      card.innerHTML = `
-        <div class="video-container">
-          <video src="${clip.video_url}" preload="metadata" muted playsinline></video>
-          <div class="card-overlay">
-            <span class="hook-score-badge">★ ${score}</span>
-            <span class="duration-badge">${Math.round(clip.duration)}s</span>
-          </div>
-          <div class="play-hint-icon">▶</div>
-        </div>
-        <div class="card-content">
-          <div class="card-meta">
-            <span class="status-badge ${clip.status}">${(clip.status || 'pending').toUpperCase()}</span>
-            <span class="music-pill">${musicTag}</span>
-          </div>
-          <h4 class="clip-title">${escapeHtml(clip.title)}</h4>
-          <p class="clip-why">${escapeHtml(clip.why_this_clip || 'High engagement hook')}</p>
-        </div>
-      `;
+  // Update Navbar Uploaded Count Badge
+  async function updateUploadedCountBadge() {
+    try {
+      const res = await fetch('/api/youtube/uploaded');
+      if (res.ok) {
+        const data = await res.json();
+        if (uploadedCountBadge) uploadedCountBadge.textContent = data.count || 0;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  updateUploadedCountBadge();
 
-      card.addEventListener('click', () => openReviewModal(clip));
-      clipsGrid.appendChild(card);
+  // Open All Uploaded Shorts Modal
+  if (viewUploadedBtn) {
+    viewUploadedBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/youtube/uploaded');
+        if (res.ok) {
+          const data = await res.json();
+          allUploadedGrid.innerHTML = '';
+          if (!data.uploaded_clips || data.uploaded_clips.length === 0) {
+            allUploadedGrid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">No clips uploaded to YouTube yet. Approve and upload clips to see them here!</div>';
+          } else {
+            data.uploaded_clips.forEach(clip => {
+              allUploadedGrid.appendChild(createClipCard(clip, true));
+            });
+          }
+          uploadedModal.classList.remove('hidden');
+        }
+      } catch (err) {
+        alert(`Failed to load uploaded videos: ${err.message}`);
+      }
+    });
+  }
+
+  if (closeUploadedModalBtn) {
+    closeUploadedModalBtn.addEventListener('click', () => {
+      uploadedModal.classList.add('hidden');
     });
   }
 

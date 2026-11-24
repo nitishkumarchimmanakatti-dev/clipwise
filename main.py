@@ -50,6 +50,7 @@ def run_pipeline(
     ownership_confirmed: bool = True,
     rights_confirmed: bool = True,
     caption_color: str = DEFAULT_CAPTION_COLOR,
+    prompt: Optional[str] = None,
 ):
     """Run full end-to-end processing pipeline for a single YouTube video."""
     ensure_ffmpeg()
@@ -98,8 +99,8 @@ def run_pipeline(
         return []
 
     # 4. Hook Scoring & Ranking
-    notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates...")
-    top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips)
+    notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates" + (f" with prompt: '{prompt}'..." if prompt else "..."))
+    top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips, prompt=prompt)
     notify("score", 75, f"Selected top {len(top_candidates)} engaging clips")
 
     # 5. Render Clips & Captions
@@ -185,6 +186,7 @@ def run_pipeline_for_file(
     progress_callback=None,
     rights_confirmed: bool = True,
     caption_color: str = DEFAULT_CAPTION_COLOR,
+    prompt: Optional[str] = None,
 ):
     """Run pipeline directly from an uploaded or local video file."""
     import subprocess
@@ -250,8 +252,8 @@ def run_pipeline_for_file(
         )
         return []
 
-    notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates...")
-    top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips)
+    notify("score", 70, f"Scoring hook potential for {len(candidates)} candidates" + (f" with prompt: '{prompt}'..." if prompt else "..."))
+    top_candidates = score_candidates(candidates, use_llm=use_llm, top_n=max_clips, prompt=prompt)
     notify("score", 75, f"Selected top {len(top_candidates)} engaging clips")
 
     clips_info = []

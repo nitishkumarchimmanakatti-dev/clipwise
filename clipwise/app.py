@@ -105,6 +105,7 @@ class GenerateRequest(BaseModel):
     ownership_confirmed: bool = False
     rights_confirmed: bool = False
     caption_color: str = DEFAULT_CAPTION_COLOR
+    prompt: Optional[str] = None
 
 
 class StatusUpdateRequest(BaseModel):
@@ -260,6 +261,7 @@ async def start_generation(
                 ownership_confirmed=True,
                 rights_confirmed=True,
                 caption_color=req.caption_color,
+                prompt=req.prompt,
             )
             tasks[task_id]["status"] = "completed"
             tasks[task_id]["progress"] = 100
@@ -289,6 +291,7 @@ async def upload_and_process_video(
     mode: str = Form("blur"),
     use_llm: bool = Form(False),
     caption_color: str = Form(DEFAULT_CAPTION_COLOR),
+    prompt: Optional[str] = Form(None),
     _auth: None = Depends(require_auth),
 ):
     """Upload a local video file (MP4/MOV) with max upload size validation."""
@@ -344,6 +347,7 @@ async def upload_and_process_video(
                     progress_callback=on_progress,
                     rights_confirmed=True,
                     caption_color=caption_color,
+                    prompt=prompt,
                 )
                 tasks[task_id]["status"] = "completed"
                 tasks[task_id]["progress"] = 100
@@ -442,7 +446,10 @@ async def get_clips_for_video(video_id: str):
             with open(mf, "r", encoding="utf-8") as f:
                 cdata = json.load(f)
                 cid = cdata["clip_id"]
-                cdata["status"] = status_map.get(cid, "pending")
+                if cdata.get("youtube_status") == "uploaded":
+                    cdata["status"] = "uploaded"
+                else:
+                    cdata["status"] = status_map.get(cid, "pending")
                 cdata["video_url"] = f"/media/video/{video_id}/{cid}.mp4"
                 cdata["srt_url"] = f"/media/download/{video_id}/{cid}.srt"
                 cdata["download_url"] = f"/media/download/{video_id}/{cid}.mp4"
@@ -492,6 +499,7 @@ async def update_clip_status_api(
                         meta["youtube_url"] = upload_result.get("url")
                         meta["youtube_uploaded_at"] = upload_result.get("uploaded_at")
                         meta["youtube_status"] = "uploaded"
+                        set_clip_status(clip_id, "uploaded", video_id=vdir.name)
                         with open(meta_path, "w", encoding="utf-8") as f:
                             json.dump(meta, f, indent=2, ensure_ascii=False)
                     except Exception as ex:
@@ -591,12 +599,45 @@ async def upload_to_youtube_api(req: YouTubeUploadRequest, _auth: None = Depends
         meta["youtube_url"] = result.get("url")
         meta["youtube_uploaded_at"] = result.get("uploaded_at")
         meta["youtube_status"] = "uploaded"
+        set_clip_status(req.clip_id, "uploaded", video_id=req.video_id)
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
         return {"status": "ok", "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"YouTube upload failed: {str(e)}")
+
+
+@app.get("/api/youtube/uploaded")
+async def get_all_uploaded_clips():
+    """Retrieve all clips across all videos that have been uploaded to YouTube."""
+    uploaded_clips = []
+    if not OUTPUT_DIR.exists():
+        return {"uploaded_clips": [], "count": 0}
+
+    for vdir in OUTPUT_DIR.iterdir():
+        if not vdir.is_dir():
+            continue
+        video_id = vdir.name
+        meta_files = sorted(vdir.glob("*_metadata.json"))
+        for mf in meta_files:
+            try:
+                with open(mf, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                if cdata.get("youtube_status") == "uploaded" or cdata.get("youtube_url"):
+                    cid = cdata["clip_id"]
+                    cdata["status"] = "uploaded"
+                    cdata["video_url"] = f"/media/video/{video_id}/{cid}.mp4"
+                    cdata["srt_url"] = f"/media/download/{video_id}/{cid}.srt"
+                    cdata["download_url"] = f"/media/download/{video_id}/{cid}.mp4"
+                    cdata["video_id"] = video_id
+                    uploaded_clips.append(cdata)
+            except Exception:
+                continue
+
+    # Sort newest uploads first
+    uploaded_clips.sort(key=lambda c: c.get("youtube_uploaded_at") or "", reverse=True)
+    return {"uploaded_clips": uploaded_clips, "count": len(uploaded_clips)}
 
 
 @app.post("/api/clips/{video_id}/{clip_id}/metadata")

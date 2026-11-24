@@ -60,7 +60,7 @@ def set_clip_status(clip_id: str, new_status: str, video_id: Optional[str] = Non
     
     If video_id is not given, searches across all output folders.
     """
-    valid_statuses = {"pending", "approved", "rejected"}
+    valid_statuses = {"pending", "approved", "rejected", "uploaded"}
     if new_status not in valid_statuses:
         raise ValueError(f"Invalid status '{new_status}'. Must be one of {valid_statuses}")
 

@@ -29,6 +29,9 @@
         </div>
       </div>
       <div class="nav-actions">
+        <button id="viewUploadedBtn" class="btn btn-secondary">
+          <span>🚀 Uploaded Videos (<span id="uploadedCountBadge">0</span>)</span>
+        </button>
         <button id="viewHistoryBtn" class="btn btn-secondary">
           <span>📁 Library</span>
         </button>
@@ -102,6 +105,22 @@
               </div>
             </div>
 
+            <!-- User Prompt & Range Guidance Input Bar -->
+            <div class="prompt-bar-group">
+              <div class="prompt-bar-label">
+                <span class="prompt-badge">🎯 AI Clipping Prompt & Range (Optional)</span>
+                <span class="prompt-desc">Specify where to clip (e.g. <code>15:00 to 45:00</code>) and what topics the clips should relate to</span>
+              </div>
+              <div class="prompt-input-wrapper">
+                <span class="prompt-input-icon">✨</span>
+                <input 
+                  type="text" 
+                  id="customPrompt" 
+                  placeholder="e.g. From 15:00 to 45:00, extract clips about Elon's mindset, Tesla Optimus, and work ethic advice" 
+                />
+              </div>
+            </div>
+
             <!-- Config Options -->
             <div class="options-bar">
               <div class="option-item">
@@ -163,12 +182,12 @@
         </div>
       </section>
 
-      <!-- Clips Gallery Section -->
+      <!-- Clips Gallery Section with Separate Uploaded Videos Column -->
       <section id="resultsSection" class="results-section hidden">
         <div class="results-header">
           <div>
-            <h3>Generated Shorts Candidates</h3>
-            <p id="resultsSubtitle">Click any clip to review, approve, re-trim, or export.</p>
+            <h3>Generated Shorts & YouTube Uploads</h3>
+            <p id="resultsSubtitle">Review candidates, approve, or watch published videos in the Uploaded Videos column.</p>
           </div>
           <div class="results-actions">
             <button id="downloadApprovedZipBtn" class="btn btn-primary btn-sm">
@@ -178,13 +197,46 @@
               <button class="pill active" data-filter="all">All</button>
               <button class="pill" data-filter="pending">Pending</button>
               <button class="pill" data-filter="approved">Approved</button>
+              <button class="pill" data-filter="uploaded">🚀 Uploaded to YouTube</button>
               <button class="pill" data-filter="rejected">Rejected</button>
             </div>
           </div>
         </div>
 
-        <div id="clipsGrid" class="clips-grid">
-          <!-- Rendered dynamically -->
+        <!-- Separate Two-Column Dashboard Layout -->
+        <div class="results-columns-container">
+          <!-- Column 1: Candidates to Review -->
+          <div class="clips-column candidates-column">
+            <div class="column-header">
+              <div class="column-title">
+                <span class="col-icon">⚡</span>
+                <h4>Candidates to Review</h4>
+              </div>
+              <span id="candidatesCountBadge" class="col-count-badge">0</span>
+            </div>
+            <div id="clipsGrid" class="clips-grid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Column 2: Uploaded Videos (Live on YouTube) -->
+          <div class="clips-column uploaded-column">
+            <div class="column-header uploaded-header">
+              <div class="column-title">
+                <span class="col-icon">🚀</span>
+                <h4>Uploaded Videos (Live on YouTube)</h4>
+              </div>
+              <span id="uploadedColCountBadge" class="col-count-badge uploaded-badge">0</span>
+            </div>
+            <div id="uploadedClipsGrid" class="clips-grid uploaded-grid">
+              <!-- Rendered dynamically when clips are uploaded -->
+              <div class="empty-column-state">
+                <div class="empty-icon">📺</div>
+                <p>No videos uploaded to YouTube yet from this batch.</p>
+                <span>Click "Approve & Upload" in any clip's review modal to publish it straight to your YouTube channel!</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -361,6 +413,24 @@
         <div class="storage-body">
           <div id="storageMetrics" class="storage-metrics">Loading storage metrics...</div>
           <button id="triggerCleanupBtn" class="btn btn-secondary">Run 7-Day Auto-Cleanup Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- All Uploaded YouTube Shorts Modal -->
+    <div id="uploadedModal" class="modal hidden">
+      <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+          <h3>🚀 All Uploaded YouTube Shorts</h3>
+          <button id="closeUploadedModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="uploaded-modal-body" style="padding: 16px 0;">
+          <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 16px;">
+            Here are all the clips you have published directly to your YouTube channel:
+          </p>
+          <div id="allUploadedGrid" class="clips-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+            <!-- Populated from /api/youtube/uploaded -->
+          </div>
         </div>
       </div>
     </div>
