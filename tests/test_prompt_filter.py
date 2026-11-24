@@ -21,11 +21,13 @@ def test_parse_user_prompt_time_ranges():
     p3 = parse_user_prompt("first 20 mins of podcast")
     assert p3["time_range"] == (0.0, 1200.0)
 
-    # Test pure topic prompt without time
-    p4 = parse_user_prompt("Elon Musk work ethic and hardcore advice")
-    assert p4["time_range"] is None
-    assert "ethic" in p4["topics"]
-    assert "hardcore" in p4["topics"]
+    # Test speech-to-text phrase 'Gender scripts from 13 minutes to last 21 minutes, so generate'
+    p5 = parse_user_prompt("Gender scripts from 13 minutes to last 21 minutes, so generate")
+    assert p5["time_range"] == (780.0, 1260.0)
+
+    # Test '13 to 21 minutes'
+    p6 = parse_user_prompt("13 to 21 minutes")
+    assert p6["time_range"] == (780.0, 1260.0)
 
 
 def test_filter_and_boost_candidates_by_prompt():

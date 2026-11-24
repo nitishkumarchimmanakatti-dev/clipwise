@@ -408,16 +408,33 @@ document.addEventListener('DOMContentLoaded', () => {
           stopTimer();
           resetSubmitBtns();
           const errText = (task.error || task.status || '').toLowerCase();
-          if (errText.includes('sign in to confirm') || errText.includes('not a bot') || errText.includes('cookies')) {
+          if (
+            errText.includes('anti-bot') ||
+            errText.includes('blocked this cloud server') ||
+            errText.includes('sign in to confirm') ||
+            errText.includes('not a bot') ||
+            errText.includes('cookies')
+          ) {
             alert(
               "⚠️ YouTube Cloud Block Detected\n\n" +
-              "YouTube blocks automated downloads on cloud datacenter servers (like Railway/AWS) with a bot challenge.\n\n" +
+              "YouTube blocks automated URL downloads on cloud datacenter servers (like Railway/AWS) with an anti-bot challenge.\n\n" +
               "👉 SOLUTION: Please switch to the 'Upload Video (Primary)' tab and upload your MP4/MOV file directly. Direct file uploads are 100% reliable and never blocked by YouTube!\n\n" +
-              "(Or run Clipwise locally on your Mac at http://127.0.0.1:8000 where your residential connection is not restricted)."
+              "(Or run Clipwise locally on your Mac at http://127.0.0.1:8000 where your residential connection is never blocked)."
             );
             // Automatically switch user to the Upload Video tab
             const uploadTab = document.querySelector('[data-tab="upload"]');
             if (uploadTab) uploadTab.click();
+          } else if (
+            errText.includes('internet connection offline') ||
+            errText.includes('failed to resolve') ||
+            errText.includes('nodename nor servname') ||
+            errText.includes('network is unreachable')
+          ) {
+            alert(
+              "⚠️ Device Offline / WiFi Disconnected\n\n" +
+              "Clipwise could not reach YouTube because your device has no active internet/WiFi connection.\n\n" +
+              "👉 SOLUTION: Please check that your Mac is connected to WiFi/Internet, then click 'Generate Clips' again."
+            );
           } else {
             alert(`Pipeline ended: ${task.error || task.status}`);
           }

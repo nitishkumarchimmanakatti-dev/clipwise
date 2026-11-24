@@ -83,8 +83,15 @@ def extract_time_range_from_text(text: str) -> Optional[Tuple[float, float]]:
         end_s = dur if unit.startswith("s") else dur * 60.0
         return (0.0, end_s)
 
-    # 2. 'from X to Y [unit]', 'between X and Y [unit]', 'X - Y [unit]', 'X to Y [unit]'
-    range_regex = r"(?:from|between|around|timeline:?)?\s*(\d+[:.]\d+|\d+(?:\.\d+)?(?:\s*[a-z]+)?)\s*(?:to|-|until|till|and)\s*(\d+[:.]\d+|\d+(?:\.\d+)?(?:\s*[a-z]+)?)\s*(mins?|minutes?|m|seconds?|secs?|s|hours?|hrs?|h)?"
+    # 2. 'from X to Y [unit]', 'between X and Y [unit]', 'X - Y [unit]', 'X to Y [unit]', 'to last Y mins'
+    range_regex = (
+        r"(?:from|between|around|timeline:?)?\s*"
+        r"(\d+[:.]\d+|\d+(?:\.\d+)?(?:\s*[a-z]+)?)\s*"
+        r"(?:to|-|until|till|and)\s*"
+        r"(?:the\s+)?(?:last\s+)?"
+        r"(\d+[:.]\d+|\d+(?:\.\d+)?(?:\s*[a-z]+)?)\s*"
+        r"(mins?|minutes?|m|seconds?|secs?|s|hours?|hrs?|h)?"
+    )
     for m in re.finditer(range_regex, text_lower):
         part1 = m.group(1).strip()
         part2 = m.group(2).strip()

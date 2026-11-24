@@ -151,48 +151,75 @@ def download_video(
     if cookies_file and cookies_file.exists():
         ydl_opts["cookiefile"] = str(cookies_file)
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Extract metadata first to check if video is an ongoing live stream
-            info_check = ydl.extract_info(url, download=False)
-            if not info_check:
-                raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
-            if info_check.get("is_live") or info_check.get("live_status") == "is_live":
-                raise ValueError(
-                    "This YouTube video is currently an ACTIVE LIVE STREAM! "
-                    "Clipwise generates clips from completed videos or finished live stream recordings. "
-                    "Please use a completed video or wait until this stream ends."
-                )
+    import time
+    last_err = None
+    info = None
 
-            # Allow full duration analysis (up to 2 hours) so clips can reach the final climax
-            MAX_SEC = 7200
-            if info_check.get("duration") and info_check["duration"] > MAX_SEC:
-                from yt_dlp.utils import download_range_func
-                ydl.params["download_ranges"] = download_range_func(None, [(0, MAX_SEC)])
+    for attempt in range(1, 3):
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Extract metadata first to check if video is an ongoing live stream
+                info_check = ydl.extract_info(url, download=False)
+                if not info_check:
+                    raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
+                if info_check.get("is_live") or info_check.get("live_status") == "is_live":
+                    raise ValueError(
+                        "This YouTube video is currently an ACTIVE LIVE STREAM! "
+                        "Clipwise generates clips from completed videos or finished live stream recordings. "
+                        "Please use a completed video or wait until this stream ends."
+                    )
 
-            info = ydl.extract_info(url, download=True)
-            if not info:
-                raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
-    except Exception as e:
-        err_msg = str(e)
-        lower_err = err_msg.lower()
-        if (
-            "sign in to confirm" in lower_err
-            or "not a bot" in lower_err
-            or "cookies" in lower_err
-            or ("bot" in lower_err and "confirm" in lower_err)
-        ):
-            raise RuntimeError(
-                "YouTube has blocked this cloud server with an anti-bot challenge for this video. "
-                "👉 Solution: Please switch to the 'Upload Video' tab to upload your video file directly "
-                "(which is 100% reliable and never blocked), or run Clipwise locally on your Mac."
-            ) from e
-        if "This live event has ended" in err_msg:
-            raise RuntimeError(
-                "This YouTube Live stream has ended and the recording is not yet available for processing. "
-                "Please use a completed YouTube video or upload the video directly via the 'Upload Video' tab."
-            ) from e
-        raise
+                # Allow full duration analysis (up to 2 hours) so clips can reach the final climax
+                MAX_SEC = 7200
+                if info_check.get("duration") and info_check["duration"] > MAX_SEC:
+                    from yt_dlp.utils import download_range_func
+                    ydl.params["download_ranges"] = download_range_func(None, [(0, MAX_SEC)])
+
+                info = ydl.extract_info(url, download=True)
+                if not info:
+                    raise RuntimeError(f"Failed to fetch metadata for URL: {url}")
+                break
+        except Exception as e:
+            last_err = e
+            err_msg = str(e)
+            lower_err = err_msg.lower()
+
+            # Retry once on network hiccups
+            if attempt == 1 and any(net_err in lower_err for net_err in ["failed to resolve", "nodename nor servname", "temporary failure", "connection reset", "timed out"]):
+                time.sleep(2)
+                continue
+
+            if (
+                "sign in to confirm" in lower_err
+                or "not a bot" in lower_err
+                or "cookies" in lower_err
+                or ("bot" in lower_err and "confirm" in lower_err)
+            ):
+                raise RuntimeError(
+                    "YouTube has blocked this cloud server with an anti-bot challenge for this video. "
+                    "👉 Solution: Please switch to the 'Upload Video' tab to upload your video file directly "
+                    "(which is 100% reliable and never blocked), or run Clipwise locally on your Mac."
+                ) from e
+            if (
+                "nodename nor servname provided" in lower_err
+                or "failed to resolve" in lower_err
+                or "temporary failure in name resolution" in lower_err
+                or "network is unreachable" in lower_err
+            ):
+                raise RuntimeError(
+                    "Internet Connection Offline: Clipwise could not connect to YouTube because your device has no internet or WiFi connection. "
+                    "👉 Solution: Please check your WiFi / Internet connection and try again."
+                ) from e
+            if "input/output error" in lower_err or "[errno 5]" in lower_err:
+                raise RuntimeError(
+                    "System I/O interruption occurred. Please re-run the job; Clipwise will resume cleanly."
+                ) from e
+            if "This live event has ended" in err_msg:
+                raise RuntimeError(
+                    "This YouTube Live stream has ended and the recording is not yet available for processing. "
+                    "Please use a completed YouTube video or upload the video directly via the 'Upload Video' tab."
+                ) from e
+            raise last_err
 
     # Save clean metadata
     metadata = {
